@@ -74,58 +74,123 @@ function Movement.setFly(enabled, speed)
         _G.__fly_enabled = %s
         _G.__fly_speed = %f
         _G.__fly_pos = nil
+        _G.__last_fly_root = nil
+        _G.__last_fly_parent = nil
+        _G.__spawn_grace_until = os.clock() + 0.35
 
         local actor = game.Players.LocalPlayer.PlayerScripts:FindFirstChild("frontlines_client_actor")
         local mainScript = actor and actor:FindFirstChild("frontlines_main")
         local env = mainScript and getsenv and getsenv(mainScript)
         local G = env and env._G or _G
 
+        -- Hook spawn and death events to prevent stale position snaps on respawn
+        if G.append_exe_set and G.exe_set_t and not _G.__solutionzFlyHooksInstalled then
+            _G.__solutionzFlyHooksInstalled = true
+            if G.exe_set_t.FPV_SOL_SPAWN then
+                pcall(G.append_exe_set, G.exe_set_t.FPV_SOL_SPAWN, "SOLUTIONZ_FLY_SPAWN", G.DEFAULT_EXE_PRIO or 100, function()
+                    _G.__fly_pos = nil
+                    _G.__last_fly_root = nil
+                    _G.__last_fly_parent = nil
+                    _G.__spawn_grace_until = os.clock() + 0.5
+                end)
+            end
+            if G.exe_set_t.FPV_SOL_DESPAWN then
+                pcall(G.append_exe_set, G.exe_set_t.FPV_SOL_DESPAWN, "SOLUTIONZ_FLY_DESPAWN", G.DEFAULT_EXE_PRIO or 100, function()
+                    _G.__fly_pos = nil
+                    _G.__last_fly_root = nil
+                    _G.__last_fly_parent = nil
+                end)
+            end
+            if G.exe_set_t.FPV_SOL_DEATH then
+                pcall(G.append_exe_set, G.exe_set_t.FPV_SOL_DEATH, "SOLUTIONZ_FLY_DEATH", G.DEFAULT_EXE_PRIO or 100, function()
+                    _G.__fly_pos = nil
+                    _G.__last_fly_root = nil
+                    _G.__last_fly_parent = nil
+                end)
+            end
+        end
+
         if not _G.__solutionzFlyConn then
             _G.__solutionzFlyConn = RunService.RenderStepped:Connect(function(dt)
                 if not _G.__fly_enabled then
                     _G.__fly_pos = nil
+                    _G.__last_fly_root = nil
                     return
                 end
 
-                local root = G.globals and G.globals.fpv_sol_instances and G.globals.fpv_sol_instances.root
+                local instances = G.globals and G.globals.fpv_sol_instances
+                local root = instances and instances.root
+                local hum = instances and instances.humanoid
+
                 if not root or not root.Parent then
                     local sol = Workspace:FindFirstChild("soldier_model")
                     root = sol and sol:FindFirstChild("HumanoidRootPart")
+                    hum = sol and sol:FindFirstChild("Humanoid")
                 end
-                if not root then return end
+                if not root or not root.Parent then
+                    _G.__fly_pos = nil
+                    _G.__last_fly_root = nil
+                    return
+                end
+
+                -- Verify character is alive
+                if hum and hum.Health <= 0 then
+                    _G.__fly_pos = nil
+                    _G.__last_fly_root = nil
+                    return
+                end
+
+                -- Detect new spawn / root instance change
+                if root ~= _G.__last_fly_root or root.Parent ~= _G.__last_fly_parent or not _G.__fly_pos then
+                    _G.__fly_pos = root.Position
+                    _G.__last_fly_root = root
+                    _G.__last_fly_parent = root.Parent
+                    _G.__spawn_grace_until = os.clock() + 0.35
+                    return
+                end
+
+                -- If position delta is unreasonably large (e.g. server teleport / respawn gap), resync smoothly
+                if (root.Position - _G.__fly_pos).Magnitude > 35 then
+                    _G.__fly_pos = root.Position
+                    return
+                end
+
+                -- Grace period check on initial spawn
+                if os.clock() < (_G.__spawn_grace_until or 0) then
+                    _G.__fly_pos = root.Position
+                    return
+                end
 
                 local cam = Workspace.CurrentCamera
                 if not cam then return end
 
-                -- Initialize locked hover position if not set
-                if not _G.__fly_pos then
-                    _G.__fly_pos = root.Position
-                end
-
                 local moveDir = Vector3.new()
 
-                -- Camera-directional WASD flight
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                    moveDir = moveDir + cam.CFrame.LookVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                    moveDir = moveDir - cam.CFrame.LookVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                    moveDir = moveDir + cam.CFrame.RightVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                    moveDir = moveDir - cam.CFrame.RightVector
-                end
+                -- Ignore flight WASD input if typing in chat/textbox or picking a keybind
+                if not UserInputService:GetFocusedTextBox() and not _G.__ui_key_sink_active then
+                    -- Camera-directional WASD flight
+                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                        moveDir = moveDir + cam.CFrame.LookVector
+                    end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                        moveDir = moveDir - cam.CFrame.LookVector
+                    end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                        moveDir = moveDir + cam.CFrame.RightVector
+                    end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                        moveDir = moveDir - cam.CFrame.RightVector
+                    end
 
-                -- Rise: LeftShift or Space
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                    moveDir = moveDir + Vector3.new(0, 1, 0)
-                end
+                    -- Rise: LeftShift or Space
+                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                        moveDir = moveDir + Vector3.new(0, 1, 0)
+                    end
 
-                -- Descend: LeftControl or C
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then
-                    moveDir = moveDir - Vector3.new(0, 1, 0)
+                    -- Descend: LeftControl or C
+                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then
+                        moveDir = moveDir - Vector3.new(0, 1, 0)
+                    end
                 end
 
                 local flySpeed = _G.__fly_speed or 50

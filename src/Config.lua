@@ -69,6 +69,7 @@ local Config = {
     AIM_BIND_MODE = "Hold",
     TOGGLE_ESP_KEY = nil,
     TOGGLE_FLY_KEY = "None",
+    TOGGLE_NOCLIP_KEY = "None",
     UNLOAD_KEY = Enum.KeyCode.K,
 
     MENU_OPEN = true,
@@ -122,6 +123,7 @@ local DEFAULT_VALUES = {
     AIM_BIND_MODE = "Hold",
     TOGGLE_ESP_KEY = "None",
     TOGGLE_FLY_KEY = "None",
+    TOGGLE_NOCLIP_KEY = "None",
     UNLOAD_KEY = "K"
 }
 
@@ -262,7 +264,7 @@ function Config.load()
             elseif val == "None" then
                 Config[key] = nil
             end
-        elseif key == "TOGGLE_AIM_KEY" or key == "TOGGLE_FLY_KEY" then
+        elseif key == "TOGGLE_AIM_KEY" or key == "TOGGLE_FLY_KEY" or key == "TOGGLE_NOCLIP_KEY" then
             if val and val ~= "None" then
                 Config[key] = val
             else
@@ -282,7 +284,7 @@ function Config.reset()
             else
                 Config[key] = nil
             end
-        elseif key == "TOGGLE_AIM_KEY" or key == "TOGGLE_FLY_KEY" then
+        elseif key == "TOGGLE_AIM_KEY" or key == "TOGGLE_FLY_KEY" or key == "TOGGLE_NOCLIP_KEY" then
             Config[key] = "None"
         else
             Config[key] = val

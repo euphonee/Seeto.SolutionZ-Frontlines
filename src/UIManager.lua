@@ -1,6 +1,7 @@
 -- ui
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
+local RunService = game:GetService("RunService")
 
 local UIManager = {
     Initialized = false,
@@ -372,6 +373,17 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
         end
     })
 
+    local defaultNoclipKey = (type(Config.TOGGLE_NOCLIP_KEY) == "string" and Config.TOGGLE_NOCLIP_KEY) or (Config.TOGGLE_NOCLIP_KEY and Config.TOGGLE_NOCLIP_KEY.Name) or "None"
+    MenuGroup:AddLabel("Noclip toggle"):AddKeyPicker("NoclipKeybind", {
+        Default = defaultNoclipKey,
+        NoUI = true,
+        Text = "Noclip toggle",
+        ChangedCallback = function(NewKey)
+            local key = (NewKey and NewKey ~= "None") and NewKey or "None"
+            updateSetting("TOGGLE_NOCLIP_KEY", key)
+        end
+    })
+
     local defaultUnloadKey = (Config.UNLOAD_KEY and Config.UNLOAD_KEY.Name) or "K"
     MenuGroup:AddLabel("Unload script"):AddKeyPicker("UnloadKeybind", {
         Default = defaultUnloadKey,
@@ -421,6 +433,7 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
             if Options.AimBindMode then Options.AimBindMode:SetValue("Toggle") end
             if Options.EspKeybind then Options.EspKeybind:SetValue("None") end
             if Options.FlyKeybind then Options.FlyKeybind:SetValue("None") end
+            if Options.NoclipKeybind then Options.NoclipKeybind:SetValue("None") end
             if Options.UnloadKeybind then Options.UnloadKeybind:SetValue("K") end
 
             queueAutoSave()
@@ -493,6 +506,15 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
             if Movement and Movement.setFly then
                 Movement.setFly(nextState, Config.FLY_SPEED or 50)
             end
+        elseif matchesKey(input, Config.TOGGLE_NOCLIP_KEY, Options and Options.NoclipKeybind) then
+            local nextState = not Config.NOCLIP_ENABLED
+            updateSetting("NOCLIP_ENABLED", nextState)
+            if Toggles.NoclipToggle and Toggles.NoclipToggle.Value ~= nextState then
+                Toggles.NoclipToggle:SetValue(nextState)
+            end
+            if Movement and Movement.setNoclip then
+                Movement.setNoclip(nextState)
+            end
         elseif Config.TOGGLE_ESP_KEY and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Config.TOGGLE_ESP_KEY then
             local nextState = not Config.ESP_ENABLED
             updateSetting("ESP_ENABLED", nextState)
@@ -507,8 +529,7 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
     end)
     table.insert(UIManager.Connections, bindInputBegan)
 
-    -- Input isolation (sinks mouse clicks & keystrokes while interacting with UI)
-    local SINK_ACTION_NAME = "SolutionZ_Frontlines_InputSink"
+    -- Input isolation (sinks game actions & discharges while clicking/typing in UI)
     local isInteractingWithUI = false
 
     local function isMouseOverUI()
@@ -524,9 +545,108 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
         if holder and holder.Visible and Library.IsMouseOverFrame and Library:IsMouseOverFrame(holder) then
             return true
         end
+
+        local mPos = UserInputService:GetMouseLocation()
+        if holder and holder.Visible then
+            local pos, size = holder.AbsolutePosition, holder.AbsoluteSize
+            if mPos.X >= pos.X and mPos.X <= (pos.X + size.X) and mPos.Y >= pos.Y and mPos.Y <= (pos.Y + size.Y) then
+                return true
+            end
+        end
+
         return false
     end
 
+    -- Setup actor control proxy
+    local pscripts = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerScripts")
+    local fca = pscripts and pscripts:FindFirstChild("frontlines_client_actor")
+    if fca and type(run_on_actor) == "function" then
+        pcall(run_on_actor, fca, [[
+            local RunService = game:GetService("RunService")
+            local act = game.Players.LocalPlayer.PlayerScripts:FindFirstChild("frontlines_client_actor")
+            local main = act and act:FindFirstChild("frontlines_main")
+            local env = main and getsenv(main)
+            local G = env and env._G or _G
+            local globals = G.globals
+            local cs = globals and globals.ctrl_states
+            local ts = globals and globals.ctrl_ts
+            if not cs then return end
+
+            if not rawget(cs, "__is_proxy") then
+                local raw = {}
+                for k, v in pairs(cs) do
+                    raw[k] = v
+                    cs[k] = nil
+                end
+                rawset(cs, "__is_proxy", true)
+                rawset(cs, "__raw", raw)
+
+                local mt = {
+                    __index = function(t, k)
+                        local sink = (act and act:GetAttribute("UISinkActive") == true) or _G.__ui_sink_active == true
+                        local keySink = (act and act:GetAttribute("UIKeySinkActive") == true) or _G.__ui_key_sink_active == true
+                        if sink then
+                            if k == "fire" or k == "trigger" or k == "hold_ads" or k == "hold_ads_aux"
+                               or k == "hold_melee_attack" or k == "hold_melee_throw" or k == "gamepad_trigger" then
+                                return false
+                            end
+                        end
+                        if keySink then
+                            if k == "hold_jump" or k == "hold_crouch" or k == "hold_reload"
+                               or k == "mv_fw" or k == "mv_bw" or k == "mv_lt" or k == "mv_rt" or k == "hold_accel" then
+                                return false
+                            end
+                        end
+                        return raw[k]
+                    end,
+                    __newindex = function(t, k, v)
+                        local sink = (act and act:GetAttribute("UISinkActive") == true) or _G.__ui_sink_active == true
+                        local keySink = (act and act:GetAttribute("UIKeySinkActive") == true) or _G.__ui_key_sink_active == true
+                        if sink then
+                            if k == "fire" or k == "trigger" or k == "hold_ads" or k == "hold_ads_aux"
+                               or k == "hold_melee_attack" or k == "hold_melee_throw" or k == "gamepad_trigger" then
+                                raw[k] = false
+                                return
+                            end
+                        end
+                        if keySink then
+                            if k == "hold_jump" or k == "hold_crouch" or k == "hold_reload"
+                               or k == "mv_fw" or k == "mv_bw" or k == "mv_lt" or k == "mv_rt" or k == "hold_accel" then
+                                raw[k] = false
+                                return
+                            end
+                        end
+                        raw[k] = v
+                    end
+                }
+                setmetatable(cs, mt)
+            end
+
+            if not _G.__solutionzSinkCleaner then
+                _G.__solutionzSinkCleaner = RunService.RenderStepped:Connect(function()
+                    local sink = (act and act:GetAttribute("UISinkActive") == true) or _G.__ui_sink_active == true
+                    if sink and ts then
+                        ts.trigger = 0
+                    end
+                end)
+            end
+        ]])
+    end
+
+    local sinkSyncConn = RunService.RenderStepped:Connect(function()
+        local isMenuOpen = (Window and Window.Holder and Window.Holder.Visible == true)
+        local mouseOver = isMenuOpen and (isMouseOverUI() or isInteractingWithUI)
+        local keyPicking = (Library and Library.IsPickingKey == true) or (UserInputService:GetFocusedTextBox() ~= nil)
+        local sinkActive = mouseOver or keyPicking
+
+        if fca then
+            fca:SetAttribute("UISinkActive", sinkActive)
+            fca:SetAttribute("UIKeySinkActive", keyPicking)
+        end
+    end)
+    table.insert(UIManager.Connections, sinkSyncConn)
+
+    local SINK_ACTION_NAME = "SolutionZ_Frontlines_InputSink"
     pcall(function() ContextActionService:UnbindAction(SINK_ACTION_NAME) end)
 
     ContextActionService:BindActionAtPriority(
@@ -582,6 +702,15 @@ function UIManager.cleanup()
     pcall(function()
         ContextActionService:UnbindAction("SolutionZ_Frontlines_InputSink")
     end)
+
+    local pscripts = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerScripts")
+    local fca = pscripts and pscripts:FindFirstChild("frontlines_client_actor")
+    if fca then
+        pcall(function()
+            fca:SetAttribute("UISinkActive", false)
+            fca:SetAttribute("UIKeySinkActive", false)
+        end)
+    end
 
     for _, c in ipairs(UIManager.Connections) do
         pcall(function() c:Disconnect() end)

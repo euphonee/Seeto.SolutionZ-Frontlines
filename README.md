@@ -3,6 +3,7 @@
 > Lightweight, modular utility suite for Frontlines.
 
 ![Showcase](assets/showcase.png)
+![Flight](assets/flight.png)
 
 ## Loadstring
 

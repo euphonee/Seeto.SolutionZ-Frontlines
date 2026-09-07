@@ -19,30 +19,32 @@ function SilentAim.setZeroSpread(enabled)
         _G.__zero_spread_enabled = %s
 
         for _, obj in ipairs(getgc(true)) do
-            if type(obj) == 'table' and rawget(obj, 'spread') ~= nil and not rawget(obj, '__is_spread_proxy') then
-                rawset(obj, '__is_spread_proxy', true)
-                local proxyStore = { spread = rawget(obj, 'spread') or 0 }
-                rawset(obj, 'spread', nil)
-                local mt = {
-                    __index = function(t, k)
-                        if k == 'spread' then
-                            if _G.__zero_spread_enabled ~= false then
-                                return 0
+            if type(obj) == 'table' and (rawget(obj, 'spread') ~= nil or rawget(obj, '__is_spread_proxy')) then
+                if not rawget(obj, '__is_spread_proxy') then
+                    rawset(obj, '__is_spread_proxy', true)
+                    local proxyStore = { spread = rawget(obj, 'spread') or 0 }
+                    rawset(obj, 'spread', nil)
+                    local mt = {
+                        __index = function(t, k)
+                            if k == 'spread' then
+                                if _G.__zero_spread_enabled ~= false then
+                                    return 0
+                                else
+                                    return rawget(proxyStore, 'spread') or 0
+                                end
+                            end
+                            return rawget(proxyStore, k)
+                        end,
+                        __newindex = function(t, k, v)
+                            if k == 'spread' then
+                                rawset(proxyStore, 'spread', v)
                             else
-                                return rawget(proxyStore, 'spread') or 0
+                                rawset(proxyStore, k, v)
                             end
                         end
-                        return rawget(proxyStore, k)
-                    end,
-                    __newindex = function(t, k, v)
-                        if k == 'spread' then
-                            rawset(proxyStore, 'spread', v)
-                        else
-                            rawset(proxyStore, k, v)
-                        end
-                    end
-                }
-                setmetatable(obj, mt)
+                    }
+                    setmetatable(obj, mt)
+                end
             end
         end
     ]], tostring(enabled ~= false)))
@@ -56,20 +58,29 @@ function SilentAim.setNoRecoil(enabled)
     pcall(run_on_actor, fca, string.format([[
         _G.__no_recoil_enabled = %s
 
-        if not _G.__recoil_proxy_installed then
-            local target = nil
-            for _, obj in ipairs(getgc(true)) do
-                if type(obj) == 'table' and (rawget(obj, 'attitude_delta') ~= nil or rawget(obj, '__is_recoil_proxy') == true) then
-                    target = obj
-                    break
-                end
+        -- Restore any previously zeroed recoil_params tables
+        if _G.__recoil_params_tracked then
+            for _, entry in ipairs(_G.__recoil_params_tracked) do
+                entry.tbl.attitude_impulse_1 = entry.attitude_impulse_1
+                entry.tbl.attitude_impulse_2 = entry.attitude_impulse_2
+                entry.tbl.cam_impulse_1 = entry.cam_impulse_1
+                entry.tbl.cam_impulse_2 = entry.cam_impulse_2
+                entry.tbl.cam_angular_impulse_1 = entry.cam_angular_impulse_1
+                entry.tbl.cam_angular_impulse_2 = entry.cam_angular_impulse_2
             end
+        end
+        if _G.__sway_params_tracked then
+            for _, entry in ipairs(_G.__sway_params_tracked) do
+                entry.tbl.max_rot_x = entry.max_rot_x
+                entry.tbl.max_rot_y = entry.max_rot_y
+            end
+        end
 
-            if target then
-                _G.__recoil_proxy_installed = true
-                rawset(target, 'attitude_delta', nil)
-                rawset(target, '__is_recoil_proxy', true)
-                local proxyStore = { attitude_delta = Vector3.new() }
+        local function attachRecoilProxy(obj)
+            if type(obj) == 'table' and not rawget(obj, '__is_recoil_proxy') then
+                rawset(obj, '__is_recoil_proxy', true)
+                local proxyStore = { attitude_delta = rawget(obj, 'attitude_delta') or Vector3.new() }
+                rawset(obj, 'attitude_delta', nil)
                 local mt = {
                     __index = function(t, k)
                         if k == 'attitude_delta' then
@@ -89,71 +100,22 @@ function SilentAim.setNoRecoil(enabled)
                         end
                     end
                 }
-                setmetatable(target, mt)
+                setmetatable(obj, mt)
             end
         end
 
-        if not _G.__recoil_params_tracked or #_G.__recoil_params_tracked == 0 then
-            _G.__recoil_params_tracked = {}
-            for _, obj in ipairs(getgc(true)) do
-                if type(obj) == 'table' and rawget(obj, 'attitude_impulse_1') ~= nil then
-                    table.insert(_G.__recoil_params_tracked, {
-                        tbl = obj,
-                        attitude_impulse_1 = obj.attitude_impulse_1,
-                        attitude_impulse_2 = obj.attitude_impulse_2,
-                        cam_impulse_1 = obj.cam_impulse_1,
-                        cam_impulse_2 = obj.cam_impulse_2,
-                        cam_angular_impulse_1 = obj.cam_angular_impulse_1,
-                        cam_angular_impulse_2 = obj.cam_angular_impulse_2,
-                    })
-                end
-            end
-        end
-
-        if not _G.__sway_params_tracked or #_G.__sway_params_tracked == 0 then
-            _G.__sway_params_tracked = {}
-            for _, obj in ipairs(getgc(true)) do
-                if type(obj) == 'table' and rawget(obj, 'aim_sway_params') ~= nil then
-                    local sp = obj.aim_sway_params
-                    table.insert(_G.__sway_params_tracked, {
-                        tbl = sp,
-                        max_rot_x = sp.max_rot_x,
-                        max_rot_y = sp.max_rot_y
-                    })
-                end
-            end
-        end
-
-        if _G.__recoil_params_tracked then
-            local zeroVec = Vector3.new(0, 0, 0)
-            for _, entry in ipairs(_G.__recoil_params_tracked) do
-                local t = entry.tbl
-                if _G.__no_recoil_enabled ~= false then
-                    t.attitude_impulse_1 = zeroVec
-                    t.attitude_impulse_2 = zeroVec
-                    t.cam_impulse_1 = zeroVec
-                    t.cam_impulse_2 = zeroVec
-                    t.cam_angular_impulse_1 = zeroVec
-                    t.cam_angular_impulse_2 = zeroVec
-                else
-                    t.attitude_impulse_1 = entry.attitude_impulse_1
-                    t.attitude_impulse_2 = entry.attitude_impulse_2
-                    t.cam_impulse_1 = entry.cam_impulse_1
-                    t.cam_impulse_2 = entry.cam_impulse_2
-                    t.cam_angular_impulse_1 = entry.cam_angular_impulse_1
-                    t.cam_angular_impulse_2 = entry.cam_angular_impulse_2
-                end
-            end
-        end
-
-        if _G.__sway_params_tracked then
-            for _, entry in ipairs(_G.__sway_params_tracked) do
-                if _G.__no_recoil_enabled ~= false then
-                    entry.tbl.max_rot_x = 0
-                    entry.tbl.max_rot_y = 0
-                else
-                    entry.tbl.max_rot_x = entry.max_rot_x
-                    entry.tbl.max_rot_y = entry.max_rot_y
+        for _, obj in ipairs(getgc(true)) do
+            if type(obj) == 'table' and (rawget(obj, 'attitude_delta') ~= nil or rawget(obj, '__is_recoil_proxy')) then
+                attachRecoilProxy(obj)
+            elseif type(obj) == 'function' then
+                local info = debug.getinfo(obj)
+                if info and info.source and (info.source:find('soldier_movement') or info.source:find('recoil_anim')) then
+                    local upvals = debug.getupvalues(obj)
+                    for _, v in pairs(upvals) do
+                        if type(v) == 'table' and (rawget(v, 'attitude_delta') ~= nil or rawget(v, '__is_recoil_proxy')) then
+                            attachRecoilProxy(v)
+                        end
+                    end
                 end
             end
         end
@@ -230,10 +192,21 @@ function SilentAim.updateAttachments(Config, Utils)
                         SilentAim.OriginalCFrames[inst] = inst.CFrame
                     end
 
-                    local naturalWorldPos = inst.WorldPosition
-                    local aimTarget = targetHeadPos or (naturalWorldPos + camLook * 1000)
-                    local targetWorld = Utils.getLookMatrix(naturalWorldPos, aimTarget)
-                    inst.CFrame = parent.CFrame:ToObjectSpace(targetWorld)
+                    if targetHeadPos then
+                        local naturalWorldPos = inst.WorldPosition
+                        local targetWorld = Utils.getLookMatrix(naturalWorldPos, targetHeadPos)
+                        inst.CFrame = parent.CFrame:ToObjectSpace(targetWorld)
+                    elseif Config.ZERO_SPREAD_ENABLED ~= false then
+                        local naturalWorldPos = inst.WorldPosition
+                        local aimTarget = naturalWorldPos + camLook * 1000
+                        local targetWorld = Utils.getLookMatrix(naturalWorldPos, aimTarget)
+                        inst.CFrame = parent.CFrame:ToObjectSpace(targetWorld)
+                    else
+                        local origCf = SilentAim.OriginalCFrames[inst]
+                        if origCf then
+                            inst.CFrame = origCf
+                        end
+                    end
                 end
             end
         end

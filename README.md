@@ -10,9 +10,8 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/euphonee/Seeto.Soluti
 
 ## Features
 
-- **Aim**: Silent aim (muzzle attachment redirection), zero spread, no camera recoil / aim sway removal, dynamic FOV targeting.
-- **Visuals**: 12-bone skeleton ESP, head indicator circle, 3-layer real-time health bar, 3D view direction indicator.
-- **Tracers**: Local-only bullet tracer beams with custom thickness, color, and fadeout lifetime.
+- **Aim**: Silent aim, no spread, no camera/sway recoil.
+- **Visuals**: Skeleton ESP, health bar, aim angles, etc.
 - **Interface**: High-performance LinoriaLib GUI, customizable binds, JSON config persistence.
 
 ## Default Binds

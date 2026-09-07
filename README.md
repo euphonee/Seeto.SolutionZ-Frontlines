@@ -2,6 +2,8 @@
 
 > Lightweight, modular utility suite for Frontlines.
 
+![Showcase](assets/showcase.png)
+
 ## Loadstring
 
 ```lua

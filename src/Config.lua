@@ -23,9 +23,9 @@ local Config = {
     ZERO_SPREAD_ENABLED = true,
     NO_RECOIL_ENABLED = true,
     TARGET_PRIORITY = "Auto",
-    FOV_RADIUS = 400,
+    FOV_RADIUS = 237,
     FOV_CIRCLE_ENABLED = true,
-    FOV_CIRCLE_TRANSPARENCY = 0.4,
+    FOV_CIRCLE_TRANSPARENCY = 0.18,
     FOV_CIRCLE_COLOR = Color3.fromRGB(255, 255, 255),
 
     -- Visuals
@@ -38,9 +38,9 @@ local Config = {
     DISABLE_TEAMMATES = true,
 
     -- Tracers
-    TRACER_BEAMS_ENABLED = true,
-    TRACER_FADEOUT_TIME = 2.0,
-    TRACER_BEAM_WIDTH = 6,
+    TRACER_BEAMS_ENABLED = false,
+    TRACER_FADEOUT_TIME = 3.4,
+    TRACER_BEAM_WIDTH = 13,
     TRACER_BEAM_COLOR = Color3.fromRGB(0, 160, 255),
 
     -- Colors
@@ -53,7 +53,7 @@ local Config = {
     TOGGLE_UI_KEY = Enum.KeyCode.Insert,
     TOGGLE_UI_KEY_ALT = Enum.KeyCode.RightShift,
     TOGGLE_AIM_KEY = "None",
-    AIM_BIND_MODE = "Toggle",
+    AIM_BIND_MODE = "Hold",
     TOGGLE_ESP_KEY = nil,
     UNLOAD_KEY = Enum.KeyCode.K,
 
@@ -81,22 +81,22 @@ local DEFAULT_VALUES = {
     ZERO_SPREAD_ENABLED = true,
     NO_RECOIL_ENABLED = true,
     TARGET_PRIORITY = "Auto",
-    FOV_RADIUS = 400,
+    FOV_RADIUS = 237,
     FOV_CIRCLE_ENABLED = true,
-    FOV_CIRCLE_TRANSPARENCY = 0.4,
+    FOV_CIRCLE_TRANSPARENCY = 0.18,
     ESP_ENABLED = true,
     SKELETON_ENABLED = true,
     HEAD_CIRCLE_ENABLED = true,
     HEALTH_BAR_ENABLED = true,
     VIEWANGLE_ENABLED = true,
     DISABLE_TEAMMATES = true,
-    TRACER_BEAMS_ENABLED = true,
-    TRACER_FADEOUT_TIME = 2.0,
-    TRACER_BEAM_WIDTH = 6,
+    TRACER_BEAMS_ENABLED = false,
+    TRACER_FADEOUT_TIME = 3.4,
+    TRACER_BEAM_WIDTH = 13,
     TOGGLE_UI_KEY = "Insert",
     TOGGLE_UI_KEY_ALT = "RightShift",
     TOGGLE_AIM_KEY = "None",
-    AIM_BIND_MODE = "Toggle",
+    AIM_BIND_MODE = "Hold",
     TOGGLE_ESP_KEY = "None",
     UNLOAD_KEY = "K"
 }

@@ -1,5 +1,6 @@
 -- ui
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local UIManager = {
     Initialized = false,
@@ -360,6 +361,17 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
         end
     })
 
+    local defaultFlyKey = (type(Config.TOGGLE_FLY_KEY) == "string" and Config.TOGGLE_FLY_KEY) or (Config.TOGGLE_FLY_KEY and Config.TOGGLE_FLY_KEY.Name) or "None"
+    MenuGroup:AddLabel("Fly toggle"):AddKeyPicker("FlyKeybind", {
+        Default = defaultFlyKey,
+        NoUI = true,
+        Text = "Fly toggle",
+        ChangedCallback = function(NewKey)
+            local key = (NewKey and NewKey ~= "None") and NewKey or "None"
+            updateSetting("TOGGLE_FLY_KEY", key)
+        end
+    })
+
     local defaultUnloadKey = (Config.UNLOAD_KEY and Config.UNLOAD_KEY.Name) or "K"
     MenuGroup:AddLabel("Unload script"):AddKeyPicker("UnloadKeybind", {
         Default = defaultUnloadKey,
@@ -408,6 +420,7 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
             if Options.AimKeybind then Options.AimKeybind:SetValue("None") end
             if Options.AimBindMode then Options.AimBindMode:SetValue("Toggle") end
             if Options.EspKeybind then Options.EspKeybind:SetValue("None") end
+            if Options.FlyKeybind then Options.FlyKeybind:SetValue("None") end
             if Options.UnloadKeybind then Options.UnloadKeybind:SetValue("K") end
 
             queueAutoSave()
@@ -430,11 +443,11 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
         Tooltip = "double click to quit"
     })
 
-    local function matchesAimKey(input)
-        local key = Config.TOGGLE_AIM_KEY
+    local function matchesKey(input, keyVal, optionObj)
+        local key = keyVal
         if not key or key == "None" or key == "" then
-            if Options and Options.AimKeybind and Options.AimKeybind.Value and Options.AimKeybind.Value ~= "None" then
-                key = Options.AimKeybind.Value
+            if optionObj and optionObj.Value and optionObj.Value ~= "None" then
+                key = optionObj.Value
             else
                 return false
             end
@@ -463,13 +476,22 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
         if Library and Library.IsPickingKey then return end
         if UserInputService:GetFocusedTextBox() then return end
 
-        if matchesAimKey(input) then
+        if matchesKey(input, Config.TOGGLE_AIM_KEY, Options and Options.AimKeybind) then
             if Config.AIM_BIND_MODE == "Toggle" then
                 local nextState = not Config.SILENT_AIM_ENABLED
                 updateSetting("SILENT_AIM_ENABLED", nextState)
                 if Toggles.SilentAim and Toggles.SilentAim.Value ~= nextState then
                     Toggles.SilentAim:SetValue(nextState)
                 end
+            end
+        elseif matchesKey(input, Config.TOGGLE_FLY_KEY, Options and Options.FlyKeybind) then
+            local nextState = not Config.FLY_ENABLED
+            updateSetting("FLY_ENABLED", nextState)
+            if Toggles.FlyToggle and Toggles.FlyToggle.Value ~= nextState then
+                Toggles.FlyToggle:SetValue(nextState)
+            end
+            if Movement and Movement.setFly then
+                Movement.setFly(nextState, Config.FLY_SPEED or 50)
             end
         elseif Config.TOGGLE_ESP_KEY and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Config.TOGGLE_ESP_KEY then
             local nextState = not Config.ESP_ENABLED
@@ -485,10 +507,82 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
     end)
     table.insert(UIManager.Connections, bindInputBegan)
 
+    -- Input isolation (sinks mouse clicks & keystrokes while interacting with UI)
+    local SINK_ACTION_NAME = "SolutionZ_Frontlines_InputSink"
+    local isInteractingWithUI = false
+
+    local function isMouseOverUI()
+        if not Library then return false end
+        if Library.OpenedFrames then
+            for frame, _ in pairs(Library.OpenedFrames) do
+                if frame and frame.Visible and Library.IsMouseOverFrame and Library:IsMouseOverFrame(frame) then
+                    return true
+                end
+            end
+        end
+        local holder = Window and Window.Holder
+        if holder and holder.Visible and Library.IsMouseOverFrame and Library:IsMouseOverFrame(holder) then
+            return true
+        end
+        return false
+    end
+
+    pcall(function() ContextActionService:UnbindAction(SINK_ACTION_NAME) end)
+
+    ContextActionService:BindActionAtPriority(
+        SINK_ACTION_NAME,
+        function(actionName, inputState, inputObject)
+            if Library and Library.IsPickingKey then
+                return Enum.ContextActionResult.Sink
+            end
+            if UserInputService:GetFocusedTextBox() then
+                if inputObject.UserInputType == Enum.UserInputType.Keyboard then
+                    return Enum.ContextActionResult.Sink
+                end
+            end
+
+            local it = inputObject.UserInputType
+            if it == Enum.UserInputType.MouseButton1
+                or it == Enum.UserInputType.MouseButton2
+                or it == Enum.UserInputType.MouseButton3
+                or it == Enum.UserInputType.MouseWheel then
+
+                if inputState == Enum.UserInputState.Begin then
+                    if isMouseOverUI() then
+                        isInteractingWithUI = true
+                        return Enum.ContextActionResult.Sink
+                    end
+                elseif inputState == Enum.UserInputState.Change then
+                    if isInteractingWithUI or isMouseOverUI() then
+                        return Enum.ContextActionResult.Sink
+                    end
+                elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
+                    if isInteractingWithUI or isMouseOverUI() then
+                        isInteractingWithUI = false
+                        return Enum.ContextActionResult.Sink
+                    end
+                end
+            end
+
+            return Enum.ContextActionResult.Pass
+        end,
+        false,
+        2000000,
+        Enum.UserInputType.MouseButton1,
+        Enum.UserInputType.MouseButton2,
+        Enum.UserInputType.MouseButton3,
+        Enum.UserInputType.MouseWheel,
+        Enum.UserInputType.Keyboard
+    )
+
     Library:Notify(windowTitle .. " Loaded!", 3)
 end
 
 function UIManager.cleanup()
+    pcall(function()
+        ContextActionService:UnbindAction("SolutionZ_Frontlines_InputSink")
+    end)
+
     for _, c in ipairs(UIManager.Connections) do
         pcall(function() c:Disconnect() end)
     end

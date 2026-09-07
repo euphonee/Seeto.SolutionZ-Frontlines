@@ -56,10 +56,63 @@ function SilentAim.setNoRecoil(enabled)
     if not fca or type(run_on_actor) ~= "function" then return end
 
     pcall(run_on_actor, fca, string.format([[
-        _G.__no_recoil_enabled = %s
+        local RunService = game:GetService("RunService")
+        local isEnabled = %s
+        _G.__no_recoil_enabled = isEnabled
 
-        -- Restore any previously zeroed recoil_params tables
-        if _G.__recoil_params_tracked then
+        local act = game.Players.LocalPlayer.PlayerScripts:FindFirstChild("frontlines_client_actor")
+        local main = act and act:FindFirstChild("frontlines_main")
+        local env = main and getsenv(main)
+        local G = env and env._G or _G
+
+        -- 1. Track and zero all recoil_params tables in GC
+        if not _G.__recoil_params_tracked then
+            _G.__recoil_params_tracked = {}
+            for _, obj in ipairs(getgc(true)) do
+                if type(obj) == 'table' and rawget(obj, 'cam_angular_impulse_1') ~= nil then
+                    table.insert(_G.__recoil_params_tracked, {
+                        tbl = obj,
+                        attitude_impulse_1 = rawget(obj, 'attitude_impulse_1') or Vector3.new(),
+                        attitude_impulse_2 = rawget(obj, 'attitude_impulse_2') or Vector3.new(),
+                        cam_impulse_1 = rawget(obj, 'cam_impulse_1') or Vector3.new(),
+                        cam_impulse_2 = rawget(obj, 'cam_impulse_2') or Vector3.new(),
+                        cam_angular_impulse_1 = rawget(obj, 'cam_angular_impulse_1') or Vector3.new(),
+                        cam_angular_impulse_2 = rawget(obj, 'cam_angular_impulse_2') or Vector3.new(),
+                        attitude_cdho_constant = rawget(obj, 'attitude_cdho_constant') or 0
+                    })
+                end
+            end
+        end
+
+        -- 2. Track and zero all sway_params tables in GC
+        if not _G.__sway_params_tracked then
+            _G.__sway_params_tracked = {}
+            for _, obj in ipairs(getgc(true)) do
+                if type(obj) == 'table' and rawget(obj, 'max_rot_x') ~= nil and rawget(obj, 'max_rot_y') ~= nil then
+                    table.insert(_G.__sway_params_tracked, {
+                        tbl = obj,
+                        max_rot_x = rawget(obj, 'max_rot_x') or 0,
+                        max_rot_y = rawget(obj, 'max_rot_y') or 0
+                    })
+                end
+            end
+        end
+
+        if isEnabled then
+            for _, entry in ipairs(_G.__recoil_params_tracked) do
+                entry.tbl.attitude_impulse_1 = Vector3.new(0, 0, 0)
+                entry.tbl.attitude_impulse_2 = Vector3.new(0, 0, 0)
+                entry.tbl.cam_impulse_1 = Vector3.new(0, 0, 0)
+                entry.tbl.cam_impulse_2 = Vector3.new(0, 0, 0)
+                entry.tbl.cam_angular_impulse_1 = Vector3.new(0, 0, 0)
+                entry.tbl.cam_angular_impulse_2 = Vector3.new(0, 0, 0)
+                entry.tbl.attitude_cdho_constant = 0
+            end
+            for _, entry in ipairs(_G.__sway_params_tracked) do
+                entry.tbl.max_rot_x = 0
+                entry.tbl.max_rot_y = 0
+            end
+        else
             for _, entry in ipairs(_G.__recoil_params_tracked) do
                 entry.tbl.attitude_impulse_1 = entry.attitude_impulse_1
                 entry.tbl.attitude_impulse_2 = entry.attitude_impulse_2
@@ -67,15 +120,15 @@ function SilentAim.setNoRecoil(enabled)
                 entry.tbl.cam_impulse_2 = entry.cam_impulse_2
                 entry.tbl.cam_angular_impulse_1 = entry.cam_angular_impulse_1
                 entry.tbl.cam_angular_impulse_2 = entry.cam_angular_impulse_2
+                entry.tbl.attitude_cdho_constant = entry.attitude_cdho_constant
             end
-        end
-        if _G.__sway_params_tracked then
             for _, entry in ipairs(_G.__sway_params_tracked) do
                 entry.tbl.max_rot_x = entry.max_rot_x
                 entry.tbl.max_rot_y = entry.max_rot_y
             end
         end
 
+        -- 3. Proxy attitude_delta on any recoil tables in GC
         local function attachRecoilProxy(obj)
             if type(obj) == 'table' and not rawget(obj, '__is_recoil_proxy') then
                 rawset(obj, '__is_recoil_proxy', true)
@@ -107,17 +160,26 @@ function SilentAim.setNoRecoil(enabled)
         for _, obj in ipairs(getgc(true)) do
             if type(obj) == 'table' and (rawget(obj, 'attitude_delta') ~= nil or rawget(obj, '__is_recoil_proxy')) then
                 attachRecoilProxy(obj)
-            elseif type(obj) == 'function' then
-                local info = debug.getinfo(obj)
-                if info and info.source and (info.source:find('soldier_movement') or info.source:find('recoil_anim')) then
-                    local upvals = debug.getupvalues(obj)
-                    for _, v in pairs(upvals) do
-                        if type(v) == 'table' and (rawget(v, 'attitude_delta') ~= nil or rawget(v, '__is_recoil_proxy')) then
-                            attachRecoilProxy(v)
-                        end
+            end
+        end
+
+        -- 4. Lock Camera Joint in RenderStepped (zeroes any procedural rotational kick / shake)
+        if not _G.__solutionzNoRecoilConn then
+            _G.__solutionzNoRecoilConn = RunService.RenderStepped:Connect(function()
+                if _G.__no_recoil_enabled ~= false then
+                    local cam_joint = G.globals and G.globals.fpv_sol_joint_trs and G.globals.fpv_sol_joint_trs[G.fpv_sol_joint_t.CAMERA]
+                    if cam_joint then
+                        cam_joint[1] = Vector3.new(0, 0, 0)
+                        cam_joint[2] = 1
+                        cam_joint[3] = 0
+                        cam_joint[4] = 0
+                        cam_joint[5] = 0
+                    end
+                    if G.globals and G.globals.fpv_sol_recoil then
+                        G.globals.fpv_sol_recoil.attitude_delta = Vector3.new(0, 0, 0)
                     end
                 end
-            end
+            end)
         end
     ]], tostring(enabled ~= false)))
 end

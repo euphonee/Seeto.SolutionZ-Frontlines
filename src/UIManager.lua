@@ -8,7 +8,11 @@ local UIManager = {
     Connections = {}
 }
 
-function UIManager.init(Config, Library, SilentAim, unloadCallback)
+function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
+    if type(Movement) == "function" and unloadCallback == nil then
+        unloadCallback = Movement
+        Movement = nil
+    end
     if UIManager.Initialized then return end
     UIManager.Initialized = true
     UIManager.Library = Library
@@ -49,6 +53,7 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
     local Tabs = {
         Aim = Window:AddTab("Aim"),
         Visuals = Window:AddTab("Visuals"),
+        Movement = Window:AddTab("Movement"),
         Settings = Window:AddTab("Settings")
     }
 
@@ -208,6 +213,97 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
         Callback = function(Value) updateSetting("TRACER_BEAMS_ENABLED", Value) end
     })
 
+    -- Movement Tab
+    local MoveMain = Tabs.Movement:AddLeftGroupbox("Speed boost")
+
+    MoveMain:AddToggle("SpeedBoost", {
+        Text = "Enable speed boost",
+        Default = (Config.SPEED_BOOST_ENABLED == true),
+        Tooltip = "increases walk and sprint speed",
+        Callback = function(Value)
+            updateSetting("SPEED_BOOST_ENABLED", Value)
+            if Movement and Movement.setSpeed then
+                Movement.setSpeed(Value, Config.SPEED_BOOST_PERCENT or 100)
+            end
+        end
+    })
+
+    MoveMain:AddSlider("SpeedPercent", {
+        Text = "Speed boost multiplier",
+        Default = Config.SPEED_BOOST_PERCENT or 100,
+        Min = 1,
+        Max = 500,
+        Rounding = 0,
+        Compact = false,
+        Suffix = "%",
+        Callback = function(Value)
+            updateSetting("SPEED_BOOST_PERCENT", Value)
+            if Movement and Movement.setSpeed then
+                Movement.setSpeed(Config.SPEED_BOOST_ENABLED == true, Value)
+            end
+        end
+    })
+
+    local MovementMisc = Tabs.Movement:AddRightGroupbox("Flight & Noclip")
+
+    MovementMisc:AddToggle("FlyToggle", {
+        Text = "Enable fly",
+        Default = (Config.FLY_ENABLED == true),
+        Tooltip = "fly with WASD & camera direction",
+        Callback = function(Value)
+            updateSetting("FLY_ENABLED", Value)
+            if Movement and Movement.setFly then
+                Movement.setFly(Value, Config.FLY_SPEED or 50)
+            end
+        end
+    })
+
+    local FlyWarningLabel
+
+    MovementMisc:AddSlider("FlySpeed", {
+        Text = "Fly speed",
+        Default = Config.FLY_SPEED or 50,
+        Min = 10,
+        Max = 300,
+        Rounding = 0,
+        Compact = false,
+        Suffix = " studs/s",
+        Callback = function(Value)
+            updateSetting("FLY_SPEED", Value)
+            if FlyWarningLabel then
+                if Value >= 250 then
+                    FlyWarningLabel:SetText("[!] (BEWARE OF KICK)")
+                    if FlyWarningLabel.TextLabel then
+                        FlyWarningLabel.TextLabel.TextColor3 = Library.RiskColor or Color3.fromRGB(255, 60, 60)
+                    end
+                else
+                    FlyWarningLabel:SetText("")
+                end
+            end
+            if Movement and Movement.setFly then
+                Movement.setFly(Config.FLY_ENABLED == true, Value)
+            end
+        end
+    })
+
+    local initWarn = ((Config.FLY_SPEED or 50) >= 250) and "[!] (BEWARE OF KICK)" or ""
+    FlyWarningLabel = MovementMisc:AddLabel(initWarn)
+    if FlyWarningLabel and FlyWarningLabel.TextLabel then
+        FlyWarningLabel.TextLabel.TextColor3 = Library.RiskColor or Color3.fromRGB(255, 60, 60)
+    end
+
+    MovementMisc:AddToggle("NoclipToggle", {
+        Text = "Enable noclip",
+        Default = (Config.NOCLIP_ENABLED == true),
+        Tooltip = "pass through walls, floors & obstacles",
+        Callback = function(Value)
+            updateSetting("NOCLIP_ENABLED", Value)
+            if Movement and Movement.setNoclip then
+                Movement.setNoclip(Value)
+            end
+        end
+    })
+
     -- Settings Tab
     local MenuGroup = Tabs.Settings:AddLeftGroupbox("Keybinds")
     local ActionsGroup = Tabs.Settings:AddRightGroupbox("Actions")
@@ -302,6 +398,11 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
             if Toggles.KnifeEsp then Toggles.KnifeEsp:SetValue(Config.KNIFE_ESP_ENABLED ~= false) end
             if Toggles.DisableTeammates then Toggles.DisableTeammates:SetValue(Config.DISABLE_TEAMMATES) end
             if Toggles.TracerBeams then Toggles.TracerBeams:SetValue(Config.TRACER_BEAMS_ENABLED) end
+            if Toggles.SpeedBoost then Toggles.SpeedBoost:SetValue(Config.SPEED_BOOST_ENABLED == true) end
+            if Options.SpeedPercent then Options.SpeedPercent:SetValue(Config.SPEED_BOOST_PERCENT or 100) end
+            if Toggles.FlyToggle then Toggles.FlyToggle:SetValue(Config.FLY_ENABLED == true) end
+            if Options.FlySpeed then Options.FlySpeed:SetValue(Config.FLY_SPEED or 50) end
+            if Toggles.NoclipToggle then Toggles.NoclipToggle:SetValue(Config.NOCLIP_ENABLED == true) end
 
             if Options.MenuKeybind then Options.MenuKeybind:SetValue("Insert") end
             if Options.AimKeybind then Options.AimKeybind:SetValue("None") end

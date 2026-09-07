@@ -78,6 +78,7 @@ local TargetEngine     = import("TargetEngine")
 local ESPManager       = import("ESPManager")
 local SilentAim        = import("SilentAim")
 local BulletTracers    = import("BulletTracers")
+local Movement         = import("Movement")
 local LinoriaLib       = import("LinoriaLib")
 local UIManager        = import("UIManager")
 
@@ -87,6 +88,7 @@ TargetEngine.init(Config)
 ESPManager.init(Config, Utils, SkeletonRenderer)
 SilentAim.init(Config, Utils)
 BulletTracers.init(Config, Utils)
+Movement.init(Config)
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1.5
@@ -108,6 +110,7 @@ local function cleanup()
     UIManager.cleanup()
     BulletTracers.cleanup()
     SilentAim.cleanup()
+    Movement.cleanup()
     ESPManager.cleanup(SkeletonRenderer)
     TargetEngine.cleanup()
 
@@ -118,7 +121,7 @@ end
 
 _G.__frontlinesJanitor = cleanup
 
-UIManager.init(Config, LinoriaLib, SilentAim, cleanup)
+UIManager.init(Config, LinoriaLib, SilentAim, Movement, cleanup)
 
 renderConn = RunService.RenderStepped:Connect(function(dt)
     local vpCenter = Camera.ViewportSize * 0.5

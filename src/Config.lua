@@ -16,7 +16,7 @@ local function ensureDirectory()
 end
 
 local Config = {
-    VERSION = "v1.2",
+    VERSION = "v1.3",
 
     -- Aim
     SILENT_AIM_ENABLED = true,
@@ -46,6 +46,13 @@ local Config = {
     TRACER_FADEOUT_TIME = 1.0,
     TRACER_BEAM_WIDTH = 2,
     TRACER_BEAM_COLOR = Color3.fromRGB(0, 160, 255),
+
+    -- Movement
+    SPEED_BOOST_ENABLED = false,
+    SPEED_BOOST_PERCENT = 100,
+    FLY_ENABLED = false,
+    FLY_SPEED = 50,
+    NOCLIP_ENABLED = false,
 
     -- Colors
     ENEMY_COLOR = Color3.fromRGB(255, 50, 50),
@@ -103,6 +110,11 @@ local DEFAULT_VALUES = {
     TRACER_BEAMS_ENABLED = false,
     TRACER_FADEOUT_TIME = 1.0,
     TRACER_BEAM_WIDTH = 2,
+    SPEED_BOOST_ENABLED = false,
+    SPEED_BOOST_PERCENT = 100,
+    FLY_ENABLED = false,
+    FLY_SPEED = 50,
+    NOCLIP_ENABLED = false,
     TOGGLE_UI_KEY = "Insert",
     TOGGLE_UI_KEY_ALT = "RightShift",
     TOGGLE_AIM_KEY = "None",

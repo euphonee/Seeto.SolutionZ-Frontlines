@@ -52,20 +52,20 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
         Settings = Window:AddTab("Settings")
     }
 
-    local AimMain = Tabs.Aim:AddLeftGroupbox("Silent Aim & Targeting")
-    local AimFov = Tabs.Aim:AddRightGroupbox("FOV Configuration")
+    local AimMain = Tabs.Aim:AddLeftGroupbox("Silent aim")
+    local AimFov = Tabs.Aim:AddRightGroupbox("FOV settings")
 
     AimMain:AddToggle("SilentAim", {
         Text = "Silent aim",
         Default = (Config.SILENT_AIM_ENABLED ~= false),
-        Tooltip = "Redirects muzzle attachment toward target",
+        Tooltip = "redirects bullets to target",
         Callback = function(Value) updateSetting("SILENT_AIM_ENABLED", Value) end
     })
 
     AimMain:AddToggle("ZeroSpread", {
         Text = "Zero spread",
         Default = (Config.ZERO_SPREAD_ENABLED ~= false),
-        Tooltip = "Eliminates hipfire and moving bullet spread dispersion",
+        Tooltip = "no spread",
         Callback = function(Value)
             updateSetting("ZERO_SPREAD_ENABLED", Value)
             if SilentAim and SilentAim.setZeroSpread then
@@ -75,9 +75,9 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
     })
 
     AimMain:AddToggle("NoRecoil", {
-        Text = "No camera recoil",
+        Text = "No recoil",
         Default = (Config.NO_RECOIL_ENABLED ~= false),
-        Tooltip = "Removes camera kick and physical recoil view deflection",
+        Tooltip = "no gun kick",
         Callback = function(Value)
             updateSetting("NO_RECOIL_ENABLED", Value)
             if SilentAim and SilentAim.setNoRecoil then
@@ -91,14 +91,14 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
         Default = Config.TARGET_PRIORITY or "Auto",
         Multi = false,
         Text = "Target priority",
-        Tooltip = "Auto: Headshot with torso fallback\nHead: Head_M\nTorso: Chest_M & Root_M\nRandom: Random bone",
+        Tooltip = "where to aim",
         Callback = function(Value) updateSetting("TARGET_PRIORITY", Value) end
     })
 
     AimFov:AddToggle("ShowFov", {
         Text = "Show FOV circle",
         Default = (Config.FOV_CIRCLE_ENABLED ~= false),
-        Tooltip = "Renders FOV boundary",
+        Tooltip = "draws fov circle",
         Callback = function(Value) updateSetting("FOV_CIRCLE_ENABLED", Value) end
     })
 
@@ -125,79 +125,91 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
     })
 
     -- Visuals Tab
-    local EspMain = Tabs.Visuals:AddLeftGroupbox("ESP Elements")
-    local TracerGroup = Tabs.Visuals:AddRightGroupbox("Bullet Tracers & Effects")
+    local EspMain = Tabs.Visuals:AddLeftGroupbox("ESP")
+    local TracerGroup = Tabs.Visuals:AddRightGroupbox("Tracers")
 
     EspMain:AddToggle("EspMaster", {
         Text = "Enable ESP",
         Default = (Config.ESP_ENABLED ~= false),
-        Tooltip = "Master ESP toggle",
+        Tooltip = "master toggle",
         Callback = function(Value) updateSetting("ESP_ENABLED", Value) end
+    })
+
+    EspMain:AddToggle("BoxEsp", {
+        Text = "Box ESP",
+        Default = (Config.BOX_ESP_ENABLED ~= false),
+        Tooltip = "draws boxes",
+        Callback = function(Value) updateSetting("BOX_ESP_ENABLED", Value) end
+    })
+
+    EspMain:AddDropdown("BoxType", {
+        Values = { "2D Box", "3D Box" },
+        Default = Config.BOX_TYPE or "2D Box",
+        Multi = false,
+        Text = "Box type",
+        Tooltip = "2d or 3d boxes",
+        Callback = function(Value) updateSetting("BOX_TYPE", Value) end
     })
 
     EspMain:AddToggle("SkeletonEsp", {
         Text = "Skeleton ESP",
         Default = (Config.SKELETON_ENABLED ~= false),
-        Tooltip = "12-bone 3D skeleton",
+        Tooltip = "draws bones",
         Callback = function(Value) updateSetting("SKELETON_ENABLED", Value) end
     })
 
-    EspMain:AddToggle("HeadCircle", {
-        Text = "Head circle",
-        Default = (Config.HEAD_CIRCLE_ENABLED ~= false),
-        Tooltip = "Head indicator circle",
-        Callback = function(Value) updateSetting("HEAD_CIRCLE_ENABLED", Value) end
+    EspMain:AddToggle("ShowNames", {
+        Text = "Player names",
+        Default = (Config.SHOW_NAMES_BELOW == true),
+        Tooltip = "shows usernames",
+        Callback = function(Value) updateSetting("SHOW_NAMES_BELOW", Value) end
     })
 
     EspMain:AddToggle("HealthBar", {
         Text = "Health bar",
         Default = (Config.HEALTH_BAR_ENABLED ~= false),
-        Tooltip = "Live 3-layer combat health bar",
+        Tooltip = "shows hp",
         Callback = function(Value) updateSetting("HEALTH_BAR_ENABLED", Value) end
     })
 
     EspMain:AddToggle("ViewAngle", {
         Text = "View angle",
         Default = (Config.VIEWANGLE_ENABLED ~= false),
-        Tooltip = "Look direction vector",
+        Tooltip = "look direction",
         Callback = function(Value) updateSetting("VIEWANGLE_ENABLED", Value) end
+    })
+
+    EspMain:AddToggle("TargetSnapline", {
+        Text = "Target snapline",
+        Default = (Config.TARGET_SNAPLINE_ENABLED == true),
+        Tooltip = "line to target",
+        Callback = function(Value) updateSetting("TARGET_SNAPLINE_ENABLED", Value) end
     })
 
     EspMain:AddToggle("DisableTeammates", {
         Text = "Filter teammates",
         Default = (Config.DISABLE_TEAMMATES ~= false),
-        Tooltip = "Hides ESP for teammates",
+        Tooltip = "hide team",
         Callback = function(Value) updateSetting("DISABLE_TEAMMATES", Value) end
     })
 
     -- Tracers Groupbox
     TracerGroup:AddToggle("TracerBeams", {
-        Text = "Bullet tracer beams",
+        Text = "Bullet tracers",
         Default = (Config.TRACER_BEAMS_ENABLED ~= false),
-        Tooltip = "Renders 3D beams visualizing actual bullet paths",
+        Tooltip = "draws bullet lines",
         Callback = function(Value) updateSetting("TRACER_BEAMS_ENABLED", Value) end
     })
 
     TracerGroup:AddSlider("TracerFadeout", {
-        Text = "Fadeout duration",
-        Default = Config.TRACER_FADEOUT_TIME or 2.0,
+        Text = "Fade duration",
+        Default = Config.TRACER_FADEOUT_TIME or 3.4,
         Min = 0.5,
         Max = 5.0,
         Rounding = 1,
         Compact = false,
         Suffix = "s",
         Callback = function(Value) updateSetting("TRACER_FADEOUT_TIME", Value) end
-    })
-
-    TracerGroup:AddSlider("TracerWidth", {
-        Text = "Beam width",
-        Default = Config.TRACER_BEAM_WIDTH or 6,
-        Min = 1,
-        Max = 20,
-        Rounding = 0,
-        Compact = false,
-        Suffix = "px",
-        Callback = function(Value) updateSetting("TRACER_BEAM_WIDTH", Value) end
     })
 
     -- Settings Tab
@@ -232,7 +244,7 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
         Default = Config.AIM_BIND_MODE or "Toggle",
         Multi = false,
         Text = "Aim bind mode",
-        Tooltip = "Toggle or Hold activation mode",
+        Tooltip = "hold or toggle",
         Callback = function(Value)
             updateSetting("AIM_BIND_MODE", Value)
             if Options and Options.AimKeybind then
@@ -257,7 +269,7 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
     })
 
     local defaultUnloadKey = (Config.UNLOAD_KEY and Config.UNLOAD_KEY.Name) or "K"
-    MenuGroup:AddLabel("Unload / Kill script"):AddKeyPicker("UnloadKeybind", {
+    MenuGroup:AddLabel("Unload script"):AddKeyPicker("UnloadKeybind", {
         Default = defaultUnloadKey,
         NoUI = true,
         Text = "Kill script",
@@ -284,14 +296,16 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
             if Options.FovOpacity then Options.FovOpacity:SetValue(math.floor((Config.FOV_CIRCLE_TRANSPARENCY or 0.4) * 100)) end
 
             if Toggles.EspMaster then Toggles.EspMaster:SetValue(Config.ESP_ENABLED) end
-            if Toggles.SkeletonEsp then Toggles.SkeletonEsp:SetValue(Config.SKELETON_ENABLED) end
-            if Toggles.HeadCircle then Toggles.HeadCircle:SetValue(Config.HEAD_CIRCLE_ENABLED) end
+            if Toggles.BoxEsp then Toggles.BoxEsp:SetValue(Config.BOX_ESP_ENABLED ~= false) end
+            if Options.BoxType then Options.BoxType:SetValue(Config.BOX_TYPE or "2D Box") end
+            if Toggles.SkeletonEsp then Toggles.SkeletonEsp:SetValue(Config.SKELETON_ENABLED ~= false) end
+            if Toggles.ShowNames then Toggles.ShowNames:SetValue(Config.SHOW_NAMES_BELOW == true) end
             if Toggles.HealthBar then Toggles.HealthBar:SetValue(Config.HEALTH_BAR_ENABLED) end
             if Toggles.ViewAngle then Toggles.ViewAngle:SetValue(Config.VIEWANGLE_ENABLED) end
+            if Toggles.TargetSnapline then Toggles.TargetSnapline:SetValue(Config.TARGET_SNAPLINE_ENABLED == true) end
             if Toggles.DisableTeammates then Toggles.DisableTeammates:SetValue(Config.DISABLE_TEAMMATES) end
             if Toggles.TracerBeams then Toggles.TracerBeams:SetValue(Config.TRACER_BEAMS_ENABLED) end
-            if Options.TracerFadeout then Options.TracerFadeout:SetValue(Config.TRACER_FADEOUT_TIME or 2.0) end
-            if Options.TracerWidth then Options.TracerWidth:SetValue(Config.TRACER_BEAM_WIDTH or 6) end
+            if Options.TracerFadeout then Options.TracerFadeout:SetValue(Config.TRACER_FADEOUT_TIME or 3.4) end
 
             if Options.MenuKeybind then Options.MenuKeybind:SetValue("Insert") end
             if Options.AimKeybind then Options.AimKeybind:SetValue("None") end
@@ -303,11 +317,11 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
             Library:Notify("Settings reset to defaults", 2)
         end,
         DoubleClick = false,
-        Tooltip = "Reset all settings to default"
+        Tooltip = "resets all settings"
     })
 
     ActionsGroup:AddButton({
-        Text = "Unload suite",
+        Text = "Unload",
         Func = function()
             if type(unloadCallback) == "function" then
                 unloadCallback()
@@ -316,7 +330,7 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
             end
         end,
         DoubleClick = true,
-        Tooltip = "Double click to unload"
+        Tooltip = "double click to quit"
     })
 
     local function matchesAimKey(input)

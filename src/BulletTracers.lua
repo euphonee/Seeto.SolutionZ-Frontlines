@@ -2,14 +2,65 @@
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Camera = Workspace.CurrentCamera
+local EPS = 0.01
 
 local BulletTracers = {
     Initialized = false,
     Connections = {},
-    ActiveBeams = {},
-    CachedMuzzles = {},
-    Container = nil
+    ActiveTracers = {},
+    DrawingPool = {},
+    CachedMuzzles = {}
 }
+
+local function getTracerLine(index)
+    local line = BulletTracers.DrawingPool[index]
+    if not line then
+        line = Drawing.new("Line")
+        line.Thickness = 2
+        line.Transparency = 1
+        line.Visible = false
+        pcall(function() line.ZIndex = 3 end)
+        BulletTracers.DrawingPool[index] = line
+    end
+    return line
+end
+
+local function renderTracerSegment(line, worldA, worldB, color, thickness, alpha)
+    local spA = Camera:WorldToViewportPoint(worldA)
+    local spB = Camera:WorldToViewportPoint(worldB)
+    local za, zb = spA.Z, spB.Z
+
+    if za > EPS and zb > EPS then
+        line.From = Vector2.new(spA.X, spA.Y)
+        line.To = Vector2.new(spB.X, spB.Y)
+        line.Color = color
+        line.Thickness = thickness or 2
+        line.Transparency = math.clamp(alpha, 0, 1)
+        line.Visible = true
+        return true
+    elseif za <= EPS and zb <= EPS then
+        line.Visible = false
+        return false
+    else
+        local t = (za - EPS) / (za - zb)
+        local clipped = worldA:Lerp(worldB, t)
+        local spc = Camera:WorldToViewportPoint(clipped)
+        local clip2D = Vector2.new(spc.X, spc.Y)
+
+        if za > EPS then
+            line.From = Vector2.new(spA.X, spA.Y)
+            line.To = clip2D
+        else
+            line.From = clip2D
+            line.To = Vector2.new(spB.X, spB.Y)
+        end
+        line.Color = color
+        line.Thickness = thickness or 2
+        line.Transparency = math.clamp(alpha, 0, 1)
+        line.Visible = true
+        return true
+    end
+end
 
 function BulletTracers.refreshCachedMuzzles(Utils)
     local list = {}
@@ -43,14 +94,6 @@ end
 function BulletTracers.init(Config, Utils)
     if BulletTracers.Initialized then return end
     BulletTracers.Initialized = true
-
-    local container = Workspace:FindFirstChild("__solutionz_tracers")
-    if not container then
-        container = Instance.new("Folder")
-        container.Name = "__solutionz_tracers"
-        container.Parent = Workspace
-    end
-    BulletTracers.Container = container
 
     BulletTracers.refreshCachedMuzzles(Utils)
 
@@ -86,69 +129,45 @@ function BulletTracers.init(Config, Utils)
             local rayRes = Workspace:Raycast(p0, dir * 2000, rayParams)
             local p1 = (rayRes and rayRes.Position) or (p0 + dir * 500)
 
-            BulletTracers.spawnBeam(p0, p1, Config)
+            local fadeoutTime = math.max(0.1, Config.TRACER_FADEOUT_TIME or 2.0)
+            local width = math.max(1, Config.TRACER_BEAM_WIDTH or 2)
+            local col = Config.TRACER_BEAM_COLOR or Color3.fromRGB(0, 160, 255)
+
+            table.insert(BulletTracers.ActiveTracers, {
+                p0 = p0,
+                p1 = p1,
+                elapsed = 0,
+                duration = fadeoutTime,
+                color = col,
+                thickness = width
+            })
         end
     end)
     table.insert(BulletTracers.Connections, childConn)
 
-    -- fade active beams
-    local updateConn = RunService.Heartbeat:Connect(function(dt)
-        local beams = BulletTracers.ActiveBeams
-        for i = #beams, 1, -1 do
-            local b = beams[i]
-            b.elapsed = b.elapsed + dt
-            local alpha = b.elapsed / b.duration
-            if alpha >= 1 then
-                pcall(function() b.beam:Destroy() end)
-                pcall(function() b.a0:Destroy() end)
-                pcall(function() b.a1:Destroy() end)
-                table.remove(beams, i)
+    local updateConn = RunService.RenderStepped:Connect(function(dt)
+        local tracers = BulletTracers.ActiveTracers
+        local activeCount = 0
+
+        for i = #tracers, 1, -1 do
+            local t = tracers[i]
+            t.elapsed = t.elapsed + dt
+
+            if t.elapsed >= t.duration then
+                table.remove(tracers, i)
             else
-                pcall(function()
-                    b.beam.Transparency = NumberSequence.new(math.clamp(alpha, 0, 1))
-                end)
+                activeCount = activeCount + 1
+                local alpha = 1 - (t.elapsed / t.duration)
+                local line = getTracerLine(activeCount)
+                renderTracerSegment(line, t.p0, t.p1, t.color, t.thickness, alpha)
             end
+        end
+
+        for i = activeCount + 1, #BulletTracers.DrawingPool do
+            BulletTracers.DrawingPool[i].Visible = false
         end
     end)
     table.insert(BulletTracers.Connections, updateConn)
-end
-
-function BulletTracers.spawnBeam(p0, p1, Config)
-    if not BulletTracers.Container then return end
-
-    local a0 = Instance.new("Attachment")
-    a0.WorldPosition = p0
-    a0.Parent = BulletTracers.Container
-
-    local a1 = Instance.new("Attachment")
-    a1.WorldPosition = p1
-    a1.Parent = BulletTracers.Container
-
-    local beam = Instance.new("Beam")
-    beam.Attachment0 = a0
-    beam.Attachment1 = a1
-
-    -- width
-    local width = (Config.TRACER_BEAM_WIDTH or 6) / 100
-    beam.Width0 = width
-    beam.Width1 = width
-    beam.Color = ColorSequence.new(Config.TRACER_BEAM_COLOR or Color3.fromRGB(0, 160, 255))
-    beam.FaceCamera = true
-    beam.LightEmission = 0
-    beam.LightInfluence = 0
-    beam.Texture = ""
-    beam.Transparency = NumberSequence.new(0)
-    beam.Parent = BulletTracers.Container
-
-    local fadeoutTime = math.max(0.1, Config.TRACER_FADEOUT_TIME or 2.0)
-
-    table.insert(BulletTracers.ActiveBeams, {
-        beam = beam,
-        a0 = a0,
-        a1 = a1,
-        elapsed = 0,
-        duration = fadeoutTime
-    })
 end
 
 function BulletTracers.cleanup()
@@ -158,19 +177,13 @@ function BulletTracers.cleanup()
         end
     end
     BulletTracers.Connections = {}
-
-    for _, b in ipairs(BulletTracers.ActiveBeams) do
-        pcall(function() b.beam:Destroy() end)
-        pcall(function() b.a0:Destroy() end)
-        pcall(function() b.a1:Destroy() end)
-    end
-    BulletTracers.ActiveBeams = {}
+    BulletTracers.ActiveTracers = {}
     BulletTracers.CachedMuzzles = {}
 
-    if BulletTracers.Container then
-        pcall(function() BulletTracers.Container:Destroy() end)
-        BulletTracers.Container = nil
+    for _, line in ipairs(BulletTracers.DrawingPool) do
+        pcall(function() line:Remove() end)
     end
+    BulletTracers.DrawingPool = {}
 
     BulletTracers.Initialized = false
 end

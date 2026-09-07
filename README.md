@@ -12,8 +12,8 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/euphonee/Seeto.Soluti
 
 ## Features
 
-- **Aim**: Silent aim, no spread, no camera/sway recoil.
-- **Visuals**: Skeleton ESP, health bar, aim angles, etc.
+- **Aim**: Silent aim, zero spread, camera recoil removal.
+- **Visuals**: 2D / 3D box ESP, skeleton ESP (with combined white styling), health bars, look angle lines, target snaplines, Drawing bullet tracers, player names.
 - **Interface**: High-performance LinoriaLib GUI, customizable binds, JSON config persistence.
 
 ## Default Binds

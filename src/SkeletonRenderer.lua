@@ -1,10 +1,18 @@
 -- visuals renderer
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
+local EPS = 0.01
 
 local SkeletonRenderer = {
     Drawings = {},
+    Snapline = nil,
     Initialized = false
+}
+
+local BOX_EDGES = {
+    {1, 2}, {2, 3}, {3, 4}, {4, 1},
+    {5, 6}, {6, 7}, {7, 8}, {8, 5},
+    {1, 5}, {2, 6}, {3, 7}, {4, 8}
 }
 
 local function getLine(name, zIndex)
@@ -20,10 +28,10 @@ local function getLine(name, zIndex)
     return d
 end
 
-local function getCircle(name, zIndex)
+local function getSquare(name, zIndex)
     local d = SkeletonRenderer.Drawings[name]
     if not d then
-        d = Drawing.new("Circle")
+        d = Drawing.new("Square")
         d.Thickness = 1.5
         d.Filled = false
         d.Transparency = 1
@@ -32,6 +40,56 @@ local function getCircle(name, zIndex)
         SkeletonRenderer.Drawings[name] = d
     end
     return d
+end
+
+local function getText(name, zIndex)
+    local d = SkeletonRenderer.Drawings[name]
+    if not d then
+        d = Drawing.new("Text")
+        d.Size = 13
+        d.Center = true
+        d.Outline = true
+        d.Transparency = 1
+        d.Visible = false
+        pcall(function() d.ZIndex = zIndex or 2 end)
+        SkeletonRenderer.Drawings[name] = d
+    end
+    return d
+end
+
+local function renderSegment(line, worldA, worldB, color, thickness)
+    local spA = Camera:WorldToViewportPoint(worldA)
+    local spB = Camera:WorldToViewportPoint(worldB)
+    local za, zb = spA.Z, spB.Z
+
+    if za > EPS and zb > EPS then
+        line.From = Vector2.new(spA.X, spA.Y)
+        line.To = Vector2.new(spB.X, spB.Y)
+        line.Color = color
+        line.Thickness = thickness or 1.5
+        line.Visible = true
+        return true
+    elseif za <= EPS and zb <= EPS then
+        line.Visible = false
+        return false
+    else
+        local t = (za - EPS) / (za - zb)
+        local clipped = worldA:Lerp(worldB, t)
+        local spc = Camera:WorldToViewportPoint(clipped)
+        local clip2D = Vector2.new(spc.X, spc.Y)
+
+        if za > EPS then
+            line.From = Vector2.new(spA.X, spA.Y)
+            line.To = clip2D
+        else
+            line.From = clip2D
+            line.To = Vector2.new(spB.X, spB.Y)
+        end
+        line.Color = color
+        line.Thickness = thickness or 1.5
+        line.Visible = true
+        return true
+    end
 end
 
 function SkeletonRenderer.init()
@@ -65,7 +123,7 @@ function SkeletonRenderer.renderSoldier(model, bones, isTarget, isFriendly, cid,
     local topScreen, topVis = Camera:WorldToViewportPoint(topWorld)
     local btmScreen, btmVis = Camera:WorldToViewportPoint(btmWorld)
 
-    if topScreen.Z <= 0 or btmScreen.Z <= 0 then
+    if topScreen.Z <= 0 and btmScreen.Z <= 0 then
         return
     end
 
@@ -75,67 +133,115 @@ function SkeletonRenderer.renderSoldier(model, bones, isTarget, isFriendly, cid,
     local barBtmY = btmScreen.Y
     local barHeight = math.max(10, barBtmY - barTopY)
     local boxWidth = math.max(10, barHeight * 0.45)
-    local minScreenX = math.min(topScreen.X, btmScreen.X) - (boxWidth / 2)
+    local centerX = (topScreen.X + btmScreen.X) * 0.5
+    local minScreenX = centerX - (boxWidth * 0.5)
 
-    -- head circle
-    if Config.HEAD_CIRCLE_ENABLED ~= false then
-        local headScreen, headVis = Camera:WorldToViewportPoint(headWorld)
-        if headScreen.Z > 0 then
-            local dist = (Camera.CFrame.Position - headWorld).Magnitude
-            local rad = math.clamp(140 / math.max(dist, 1), 3, 22)
-            indices.circleIdx = indices.circleIdx + 1
-            local circle = getCircle("circle_" .. indices.circleIdx, 1)
-            circle.Position = Vector2.new(headScreen.X, headScreen.Y)
-            circle.Radius = rad
-            circle.Color = primaryColor
-            circle.Transparency = 1
-            circle.Visible = true
+    local boxEnabled = (Config.BOX_ESP_ENABLED ~= false)
+    local skeletonEnabled = (Config.SKELETON_ENABLED ~= false)
+    local bothEnabled = boxEnabled and skeletonEnabled
+
+    local boxColor = primaryColor
+    local skeletonColor = bothEnabled and Color3.fromRGB(255, 255, 255) or primaryColor
+
+    -- Box ESP
+    if boxEnabled then
+        local boxType = Config.BOX_TYPE or "2D Box"
+        if boxType == "2D Box" or boxType == "2D" then
+            if topScreen.Z > 0 or btmScreen.Z > 0 then
+                indices.box2dIdx = indices.box2dIdx + 1
+                local box = getSquare("box2d_" .. indices.box2dIdx, 1)
+                box.Position = Vector2.new(minScreenX, barTopY)
+                box.Size = Vector2.new(boxWidth, barHeight)
+                box.Color = boxColor
+                box.Thickness = 1.5
+                box.Filled = false
+                box.Visible = true
+            end
+        elseif boxType == "3D Box" or boxType == "3D" then
+            local rootPos = (rootBone and rootBone.TransformedWorldCFrame.Position) or model:GetPivot().Position
+            local topY = topWorld.Y
+            local btmY = btmWorld.Y
+            local centerYWorld = (topY + btmY) * 0.5
+            local height = math.max(1, topY - btmY)
+            local centerWorld = Vector3.new(rootPos.X, centerYWorld, rootPos.Z)
+            local rot = model:GetPivot().Rotation
+            local cf = CFrame.new(centerWorld) * rot
+            local halfX, halfY, halfZ = 1.35, height * 0.5, 1.35
+
+            local corners = {
+                cf * Vector3.new(-halfX,  halfY, -halfZ),
+                cf * Vector3.new( halfX,  halfY, -halfZ),
+                cf * Vector3.new( halfX,  halfY,  halfZ),
+                cf * Vector3.new(-halfX,  halfY,  halfZ),
+                cf * Vector3.new(-halfX, -halfY, -halfZ),
+                cf * Vector3.new( halfX, -halfY, -halfZ),
+                cf * Vector3.new( halfX, -halfY,  halfZ),
+                cf * Vector3.new(-halfX, -halfY,  halfZ)
+            }
+
+            local minX, maxX = math.huge, -math.huge
+            local minY, maxY = math.huge, -math.huge
+            local anyRendered = false
+
+            for _, edge in ipairs(BOX_EDGES) do
+                local pA = corners[edge[1]]
+                local pB = corners[edge[2]]
+                indices.box3dIdx = indices.box3dIdx + 1
+                local line = getLine("box3d_" .. indices.box3dIdx, 1)
+                local ok = renderSegment(line, pA, pB, boxColor, 1.5)
+                if ok then anyRendered = true end
+            end
+
+            if anyRendered then
+                for _, corner in ipairs(corners) do
+                    local sp = Camera:WorldToViewportPoint(corner)
+                    if sp.Z > 0 then
+                        if sp.X < minX then minX = sp.X end
+                        if sp.X > maxX then maxX = sp.X end
+                        if sp.Y < minY then minY = sp.Y end
+                        if sp.Y > maxY then maxY = sp.Y end
+                    end
+                end
+
+                if minX < maxX and minY < maxY then
+                    barTopY = minY
+                    barBtmY = maxY
+                    barHeight = math.max(10, barBtmY - barTopY)
+                    boxWidth = math.max(10, maxX - minX)
+                    centerX = (minX + maxX) * 0.5
+                    minScreenX = minX
+                end
+            end
         end
     end
 
-    -- bones
-    if Config.SKELETON_ENABLED ~= false then
+    -- Skeleton Bones
+    if skeletonEnabled then
         for _, pair in ipairs(Utils.CONNECTIONS) do
             local b1 = bones[pair[1]]
             local b2 = bones[pair[2]]
             if b1 and b2 then
                 local p1 = b1.TransformedWorldCFrame.Position
                 local p2 = b2.TransformedWorldCFrame.Position
-                local sp1 = Camera:WorldToViewportPoint(p1)
-                local sp2 = Camera:WorldToViewportPoint(p2)
-
-                if sp1.Z > 0 and sp2.Z > 0 then
-                    indices.lineIdx = indices.lineIdx + 1
-                    local line = getLine("line_" .. indices.lineIdx, 1)
-                    line.From = Vector2.new(sp1.X, sp1.Y)
-                    line.To = Vector2.new(sp2.X, sp2.Y)
-                    line.Color = primaryColor
-                    line.Visible = true
-                end
+                indices.lineIdx = indices.lineIdx + 1
+                local line = getLine("line_" .. indices.lineIdx, 1)
+                renderSegment(line, p1, p2, skeletonColor, 1.5)
             end
         end
     end
 
-    -- look dir
+    -- View Angle Line
     if Config.VIEWANGLE_ENABLED ~= false then
         local lookDir = headBone.TransformedWorldCFrame.UpVector
         local lookLength = Config.LOOK_LINE_LENGTH or 4.5
         local lookTargetWorld = headWorld + (lookDir * lookLength)
-        local spLookStart = Camera:WorldToViewportPoint(headWorld)
-        local spLookEnd = Camera:WorldToViewportPoint(lookTargetWorld)
 
-        if spLookStart.Z > 0 and spLookEnd.Z > 0 then
-            indices.lookIdx = indices.lookIdx + 1
-            local lookLine = getLine("look_line_" .. indices.lookIdx, 3)
-            lookLine.From = Vector2.new(spLookStart.X, spLookStart.Y)
-            lookLine.To = Vector2.new(spLookEnd.X, spLookEnd.Y)
-            lookLine.Thickness = 1.5
-            lookLine.Color = Config.LOOK_LINE_COLOR or Color3.fromRGB(255, 255, 255)
-            lookLine.Visible = true
-        end
+        indices.lookIdx = indices.lookIdx + 1
+        local lookLine = getLine("look_line_" .. indices.lookIdx, 3)
+        renderSegment(lookLine, headWorld, lookTargetWorld, Config.LOOK_LINE_COLOR or Color3.fromRGB(255, 255, 255), 1.5)
     end
 
-    -- health bar
+    -- Health Bar
     if Config.HEALTH_BAR_ENABLED ~= false then
         local hpPct = Utils.getLiveHealth(cid, enemyGuis)
         local hpCol = Utils.getHealthColor(hpPct)
@@ -171,27 +277,65 @@ function SkeletonRenderer.renderSoldier(model, bones, isTarget, isFriendly, cid,
             fillLine.Visible = false
         end
     end
+
+    -- Player Name (below visuals)
+    if Config.SHOW_NAMES_BELOW ~= false then
+        local name = Utils.getEnemyName(cid, enemyGuis)
+        indices.nameIdx = indices.nameIdx + 1
+        local nameText = getText("name_" .. indices.nameIdx, 3)
+        nameText.Text = name
+        nameText.Position = Vector2.new(centerX, barBtmY + 4)
+        nameText.Color = primaryColor
+        nameText.Visible = true
+    end
+end
+
+function SkeletonRenderer.renderSnapline(Config)
+    local snapline = SkeletonRenderer.Snapline
+    if not snapline then
+        snapline = Drawing.new("Line")
+        snapline.Thickness = 1.5
+        snapline.Transparency = 1
+        snapline.Visible = false
+        pcall(function() snapline.ZIndex = 4 end)
+        SkeletonRenderer.Snapline = snapline
+    end
+
+    if Config.TARGET_SNAPLINE_ENABLED and Config.CurrentTargetActor and Config.CurrentTargetHeadPos then
+        local sp, vis = Camera:WorldToViewportPoint(Config.CurrentTargetHeadPos)
+        if sp.Z > 0 then
+            local center = Camera.ViewportSize * 0.5
+            snapline.From = Vector2.new(center.X, center.Y)
+            snapline.To = Vector2.new(sp.X, sp.Y)
+            snapline.Color = Config.SNAPLINE_COLOR or Config.TARGET_COLOR or Color3.fromRGB(0, 255, 120)
+            snapline.Visible = true
+        else
+            snapline.Visible = false
+        end
+    else
+        snapline.Visible = false
+    end
 end
 
 function SkeletonRenderer.hideUnused(indices)
     for k, obj in pairs(SkeletonRenderer.Drawings) do
-        if k:find("line_") and not k:find("look_line_") then
+        if k:find("^line_") then
             local id = tonumber(k:sub(6))
             if id and id > indices.lineIdx then obj.Visible = false end
-        elseif k:find("look_line_") then
+        elseif k:find("^box2d_") then
+            local id = tonumber(k:sub(7))
+            if id and id > indices.box2dIdx then obj.Visible = false end
+        elseif k:find("^box3d_") then
+            local id = tonumber(k:sub(7))
+            if id and id > indices.box3dIdx then obj.Visible = false end
+        elseif k:find("^look_line_") then
             local id = tonumber(k:sub(11))
             if id and id > indices.lookIdx then obj.Visible = false end
-        elseif k:find("circle_") and k ~= "fov_circle" then
-            local id = tonumber(k:sub(8))
-            if id and id > indices.circleIdx then obj.Visible = false end
-        elseif k:find("hbar_bg_") then
-            local id = tonumber(k:sub(9))
-            if id and id > indices.barIdx then obj.Visible = false end
-        elseif k:find("hbar_drain_") then
-            local id = tonumber(k:sub(12))
-            if id and id > indices.barIdx then obj.Visible = false end
-        elseif k:find("hbar_fill_") then
-            local id = tonumber(k:sub(11))
+        elseif k:find("^name_") then
+            local id = tonumber(k:sub(6))
+            if id and id > indices.nameIdx then obj.Visible = false end
+        elseif k:find("^hbar_bg_") or k:find("^hbar_drain_") or k:find("^hbar_fill_") then
+            local id = tonumber(k:match("%d+$"))
             if id and id > indices.barIdx then obj.Visible = false end
         end
     end
@@ -202,6 +346,12 @@ function SkeletonRenderer.cleanup()
         pcall(function() obj:Remove() end)
     end
     SkeletonRenderer.Drawings = {}
+
+    if SkeletonRenderer.Snapline then
+        pcall(function() SkeletonRenderer.Snapline:Remove() end)
+        SkeletonRenderer.Snapline = nil
+    end
+
     SkeletonRenderer.Initialized = false
 end
 

@@ -16,13 +16,18 @@ end
 function ESPManager.update(Config, Utils, SkeletonRenderer)
     local indices = {
         lineIdx = 0,
-        circleIdx = 0,
+        box2dIdx = 0,
+        box3dIdx = 0,
         barIdx = 0,
-        lookIdx = 0
+        lookIdx = 0,
+        nameIdx = 0
     }
 
     if Config.ESP_ENABLED == false then
         SkeletonRenderer.hideUnused(indices)
+        if SkeletonRenderer.renderSnapline then
+            SkeletonRenderer.renderSnapline(Config)
+        end
         return
     end
 
@@ -60,6 +65,10 @@ function ESPManager.update(Config, Utils, SkeletonRenderer)
                 )
             end
         end
+    end
+
+    if SkeletonRenderer.renderSnapline then
+        SkeletonRenderer.renderSnapline(Config)
     end
 
     SkeletonRenderer.hideUnused(indices)

@@ -151,4 +151,15 @@ function Utils.getHealthColor(pct)
     return Color3.new(r, g, 0)
 end
 
+function Utils.getEnemyName(cid, enemyGuis)
+    if cid and enemyGuis and enemyGuis[cid] then
+        local eg = enemyGuis[cid]
+        local nl = eg:FindFirstChild("name_label")
+        if nl and nl.Text and #nl.Text > 0 then
+            return nl.Text
+        end
+    end
+    return "Enemy"
+end
+
 return Utils

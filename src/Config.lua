@@ -16,7 +16,7 @@ local function ensureDirectory()
 end
 
 local Config = {
-    VERSION = "v1.0",
+    VERSION = "v1.1",
 
     -- Aim
     SILENT_AIM_ENABLED = true,
@@ -30,22 +30,26 @@ local Config = {
 
     -- Visuals
     ESP_ENABLED = true,
+    BOX_ESP_ENABLED = true,
+    BOX_TYPE = "2D Box",
     SKELETON_ENABLED = true,
-    HEAD_CIRCLE_ENABLED = true,
+    SHOW_NAMES_BELOW = false,
     HEALTH_BAR_ENABLED = true,
     VIEWANGLE_ENABLED = true,
     LOOK_LINE_LENGTH = 4.5,
+    TARGET_SNAPLINE_ENABLED = false,
     DISABLE_TEAMMATES = true,
 
     -- Tracers
     TRACER_BEAMS_ENABLED = false,
     TRACER_FADEOUT_TIME = 3.4,
-    TRACER_BEAM_WIDTH = 13,
+    TRACER_BEAM_WIDTH = 2,
     TRACER_BEAM_COLOR = Color3.fromRGB(0, 160, 255),
 
     -- Colors
     ENEMY_COLOR = Color3.fromRGB(255, 50, 50),
     TARGET_COLOR = Color3.fromRGB(0, 255, 120),
+    SNAPLINE_COLOR = Color3.fromRGB(0, 255, 120),
     LOOK_LINE_COLOR = Color3.fromRGB(255, 255, 255),
     FRIENDLY_COLOR = Color3.fromRGB(60, 140, 255),
 
@@ -85,14 +89,17 @@ local DEFAULT_VALUES = {
     FOV_CIRCLE_ENABLED = true,
     FOV_CIRCLE_TRANSPARENCY = 0.18,
     ESP_ENABLED = true,
+    BOX_ESP_ENABLED = true,
+    BOX_TYPE = "2D Box",
     SKELETON_ENABLED = true,
-    HEAD_CIRCLE_ENABLED = true,
+    SHOW_NAMES_BELOW = false,
     HEALTH_BAR_ENABLED = true,
     VIEWANGLE_ENABLED = true,
+    TARGET_SNAPLINE_ENABLED = false,
     DISABLE_TEAMMATES = true,
     TRACER_BEAMS_ENABLED = false,
     TRACER_FADEOUT_TIME = 3.4,
-    TRACER_BEAM_WIDTH = 13,
+    TRACER_BEAM_WIDTH = 2,
     TOGGLE_UI_KEY = "Insert",
     TOGGLE_UI_KEY_ALT = "RightShift",
     TOGGLE_AIM_KEY = "None",

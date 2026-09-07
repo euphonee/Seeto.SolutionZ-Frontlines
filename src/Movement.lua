@@ -208,11 +208,29 @@ function Movement.setFly(enabled, speed)
 end
 
 function Movement.setNoclip(enabled)
+    local isEnabled = (enabled ~= false)
+    Movement.NoclipEnabled = isEnabled
+
+    if not isEnabled then
+        local lp = game:GetService("Players").LocalPlayer
+        local char = lp and lp.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    pcall(function() part.CanCollide = true end)
+                end
+            end
+        end
+        local solModel = game:GetService("Workspace"):FindFirstChild("soldier_model")
+        if solModel then
+            local solHRP = solModel:FindFirstChild("HumanoidRootPart")
+            if solHRP then pcall(function() solHRP.CanCollide = true end) end
+        end
+    end
+
     local pscripts = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerScripts")
     local fca = pscripts and pscripts:FindFirstChild("frontlines_client_actor")
     if not fca or type(run_on_actor) ~= "function" then return end
-
-    Movement.NoclipEnabled = enabled
 
     pcall(run_on_actor, fca, string.format([[
         local RunService = game:GetService("RunService")
@@ -227,9 +245,38 @@ function Movement.setNoclip(enabled)
         local env = mainScript and getsenv and getsenv(mainScript)
         local G = env and env._G or _G
 
+        local function restoreCollisions()
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = true end)
+                    end
+                end
+            end
+            local root = G.globals and G.globals.fpv_sol_instances and G.globals.fpv_sol_instances.root
+            local solModel = root and root.Parent or Workspace:FindFirstChild("soldier_model")
+            if solModel then
+                local solHRP = solModel:FindFirstChild("HumanoidRootPart")
+                if solHRP then pcall(function() solHRP.CanCollide = true end) end
+            end
+        end
+
+        if not _G.__noclip_enabled then
+            restoreCollisions()
+        end
+
         if not _G.__solutionzNoclipConn then
             _G.__solutionzNoclipConn = RunService.Stepped:Connect(function()
-                if not _G.__noclip_enabled then return end
+                if not _G.__noclip_enabled then
+                    if _G.__noclip_active then
+                        _G.__noclip_active = false
+                        restoreCollisions()
+                    end
+                    return
+                end
+
+                _G.__noclip_active = true
 
                 -- Disable collision on soldier_model
                 local root = G.globals and G.globals.fpv_sol_instances and G.globals.fpv_sol_instances.root
@@ -253,7 +300,7 @@ function Movement.setNoclip(enabled)
                 end
             end)
         end
-    ]], tostring(enabled ~= false)))
+    ]], tostring(isEnabled)))
 end
 
 function Movement.init(Config)
@@ -290,6 +337,22 @@ function Movement.cleanup()
             _G.__fly_speed = 50
             _G.__fly_pos = nil
             _G.__noclip_enabled = false
+            _G.__noclip_active = false
+
+            local lp = game.Players.LocalPlayer
+            local char = lp and lp.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = true end)
+                    end
+                end
+            end
+            local solModel = game.Workspace:FindFirstChild("soldier_model")
+            if solModel then
+                local solHRP = solModel:FindFirstChild("HumanoidRootPart")
+                if solHRP then pcall(function() solHRP.CanCollide = true end) end
+            end
 
             local actor = game.Players.LocalPlayer.PlayerScripts:FindFirstChild("frontlines_client_actor")
             local mainScript = actor and actor:FindFirstChild("frontlines_main")

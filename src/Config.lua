@@ -16,7 +16,7 @@ local function ensureDirectory()
 end
 
 local Config = {
-    VERSION = "v1.6",
+    VERSION = "v1.7",
 
     -- Aim
     SILENT_AIM_ENABLED = true,

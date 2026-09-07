@@ -290,6 +290,49 @@ function SkeletonRenderer.renderSoldier(model, bones, isTarget, isFriendly, cid,
     end
 end
 
+function SkeletonRenderer.renderKnifeIndicator(worldPos, Config, indices)
+    local sp, vis = Camera:WorldToViewportPoint(worldPos)
+    if sp.Z <= 0 then return end
+
+    local cx, cy = sp.X, sp.Y
+    local s = 4.24
+    local col = Config.KNIFE_COLOR or Color3.fromRGB(255, 230, 0)
+
+    local pTop = Vector2.new(cx, cy - s)
+    local pRight = Vector2.new(cx + s, cy)
+    local pBottom = Vector2.new(cx, cy + s)
+    local pLeft = Vector2.new(cx - s, cy)
+
+    indices.knifeIdx = indices.knifeIdx + 1
+    local l1 = getLine("knife_l1_" .. indices.knifeIdx, 3)
+    l1.From = pTop
+    l1.To = pRight
+    l1.Color = col
+    l1.Thickness = 1.5
+    l1.Visible = true
+
+    local l2 = getLine("knife_l2_" .. indices.knifeIdx, 3)
+    l2.From = pRight
+    l2.To = pBottom
+    l2.Color = col
+    l2.Thickness = 1.5
+    l2.Visible = true
+
+    local l3 = getLine("knife_l3_" .. indices.knifeIdx, 3)
+    l3.From = pBottom
+    l3.To = pLeft
+    l3.Color = col
+    l3.Thickness = 1.5
+    l3.Visible = true
+
+    local l4 = getLine("knife_l4_" .. indices.knifeIdx, 3)
+    l4.From = pLeft
+    l4.To = pTop
+    l4.Color = col
+    l4.Thickness = 1.5
+    l4.Visible = true
+end
+
 function SkeletonRenderer.renderSnapline(Config)
     local snapline = SkeletonRenderer.Snapline
     if not snapline then
@@ -334,6 +377,9 @@ function SkeletonRenderer.hideUnused(indices)
         elseif k:find("^name_") then
             local id = tonumber(k:sub(6))
             if id and id > indices.nameIdx then obj.Visible = false end
+        elseif k:find("^knife_l") then
+            local id = tonumber(k:match("%d+$"))
+            if id and id > indices.knifeIdx then obj.Visible = false end
         elseif k:find("^hbar_bg_") or k:find("^hbar_drain_") or k:find("^hbar_fill_") then
             local id = tonumber(k:match("%d+$"))
             if id and id > indices.barIdx then obj.Visible = false end

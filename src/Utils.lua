@@ -162,4 +162,17 @@ function Utils.getEnemyName(cid, enemyGuis)
     return "Enemy"
 end
 
+function Utils.getThrownKnives()
+    local knives = {}
+    for _, child in ipairs(Workspace:GetChildren()) do
+        if child:IsA("Model") and (child.Name == "combat_knife" or child.Name:lower():find("knife")) then
+            local primary = child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart")
+            if primary and primary.Position.Magnitude > 1 then
+                table.insert(knives, primary.Position)
+            end
+        end
+    end
+    return knives
+end
+
 return Utils

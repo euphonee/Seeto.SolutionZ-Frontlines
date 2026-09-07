@@ -186,6 +186,13 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
         Callback = function(Value) updateSetting("TARGET_SNAPLINE_ENABLED", Value) end
     })
 
+    EspMain:AddToggle("KnifeEsp", {
+        Text = "Knife indicator",
+        Default = (Config.KNIFE_ESP_ENABLED ~= false),
+        Tooltip = "yellow diamond on knives",
+        Callback = function(Value) updateSetting("KNIFE_ESP_ENABLED", Value) end
+    })
+
     EspMain:AddToggle("DisableTeammates", {
         Text = "Filter teammates",
         Default = (Config.DISABLE_TEAMMATES ~= false),
@@ -199,17 +206,6 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
         Default = (Config.TRACER_BEAMS_ENABLED ~= false),
         Tooltip = "draws bullet lines",
         Callback = function(Value) updateSetting("TRACER_BEAMS_ENABLED", Value) end
-    })
-
-    TracerGroup:AddSlider("TracerFadeout", {
-        Text = "Fade duration",
-        Default = Config.TRACER_FADEOUT_TIME or 3.4,
-        Min = 0.5,
-        Max = 5.0,
-        Rounding = 1,
-        Compact = false,
-        Suffix = "s",
-        Callback = function(Value) updateSetting("TRACER_FADEOUT_TIME", Value) end
     })
 
     -- Settings Tab
@@ -303,9 +299,9 @@ function UIManager.init(Config, Library, SilentAim, unloadCallback)
             if Toggles.HealthBar then Toggles.HealthBar:SetValue(Config.HEALTH_BAR_ENABLED) end
             if Toggles.ViewAngle then Toggles.ViewAngle:SetValue(Config.VIEWANGLE_ENABLED) end
             if Toggles.TargetSnapline then Toggles.TargetSnapline:SetValue(Config.TARGET_SNAPLINE_ENABLED == true) end
+            if Toggles.KnifeEsp then Toggles.KnifeEsp:SetValue(Config.KNIFE_ESP_ENABLED ~= false) end
             if Toggles.DisableTeammates then Toggles.DisableTeammates:SetValue(Config.DISABLE_TEAMMATES) end
             if Toggles.TracerBeams then Toggles.TracerBeams:SetValue(Config.TRACER_BEAMS_ENABLED) end
-            if Options.TracerFadeout then Options.TracerFadeout:SetValue(Config.TRACER_FADEOUT_TIME or 3.4) end
 
             if Options.MenuKeybind then Options.MenuKeybind:SetValue("Insert") end
             if Options.AimKeybind then Options.AimKeybind:SetValue("None") end

@@ -20,7 +20,8 @@ function ESPManager.update(Config, Utils, SkeletonRenderer)
         box3dIdx = 0,
         barIdx = 0,
         lookIdx = 0,
-        nameIdx = 0
+        nameIdx = 0,
+        knifeIdx = 0
     }
 
     if Config.ESP_ENABLED == false then
@@ -64,6 +65,14 @@ function ESPManager.update(Config, Utils, SkeletonRenderer)
                     indices
                 )
             end
+        end
+    end
+
+    -- Thrown knives
+    if Config.KNIFE_ESP_ENABLED ~= false and Utils.getThrownKnives then
+        local knives = Utils.getThrownKnives()
+        for _, kPos in ipairs(knives) do
+            SkeletonRenderer.renderKnifeIndicator(kPos, Config, indices)
         end
     end
 

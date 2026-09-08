@@ -208,25 +208,8 @@ function Movement.setFly(enabled, speed)
 end
 
 function Movement.setNoclip(enabled)
-    local isEnabled = (enabled ~= false)
+    local isEnabled = (enabled == true)
     Movement.NoclipEnabled = isEnabled
-
-    if not isEnabled then
-        local lp = game:GetService("Players").LocalPlayer
-        local char = lp and lp.Character
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    pcall(function() part.CanCollide = true end)
-                end
-            end
-        end
-        local solModel = game:GetService("Workspace"):FindFirstChild("soldier_model")
-        if solModel then
-            local solHRP = solModel:FindFirstChild("HumanoidRootPart")
-            if solHRP then pcall(function() solHRP.CanCollide = true end) end
-        end
-    end
 
     local pscripts = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerScripts")
     local fca = pscripts and pscripts:FindFirstChild("frontlines_client_actor")
@@ -238,6 +221,7 @@ function Movement.setNoclip(enabled)
         local Players = game:GetService("Players")
         local LocalPlayer = Players.LocalPlayer
 
+        local wasEnabled = _G.__noclip_enabled
         _G.__noclip_enabled = %s
 
         local actor = LocalPlayer.PlayerScripts:FindFirstChild("frontlines_client_actor")
@@ -250,19 +234,31 @@ function Movement.setNoclip(enabled)
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = true end)
+                        pcall(function()
+                            if part.Name == "HumanoidRootPart" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso" then
+                                part.CanCollide = true
+                            else
+                                part.CanCollide = false
+                            end
+                        end)
                     end
                 end
             end
             local root = G.globals and G.globals.fpv_sol_instances and G.globals.fpv_sol_instances.root
             local solModel = root and root.Parent or Workspace:FindFirstChild("soldier_model")
             if solModel then
-                local solHRP = solModel:FindFirstChild("HumanoidRootPart")
-                if solHRP then pcall(function() solHRP.CanCollide = true end) end
+                for _, part in ipairs(solModel:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        pcall(function()
+                            part.CanCollide = (part == solModel.PrimaryPart or part.Name == "HumanoidRootPart")
+                        end)
+                    end
+                end
             end
         end
 
-        if not _G.__noclip_enabled then
+        if wasEnabled and not _G.__noclip_enabled then
+            _G.__noclip_active = false
             restoreCollisions()
         end
 
@@ -344,14 +340,25 @@ function Movement.cleanup()
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = true end)
+                        pcall(function()
+                            if part.Name == "HumanoidRootPart" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso" then
+                                part.CanCollide = true
+                            else
+                                part.CanCollide = false
+                            end
+                        end)
                     end
                 end
             end
             local solModel = game.Workspace:FindFirstChild("soldier_model")
             if solModel then
-                local solHRP = solModel:FindFirstChild("HumanoidRootPart")
-                if solHRP then pcall(function() solHRP.CanCollide = true end) end
+                for _, part in ipairs(solModel:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        pcall(function()
+                            part.CanCollide = (part == solModel.PrimaryPart or part.Name == "HumanoidRootPart")
+                        end)
+                    end
+                end
             end
 
             local actor = game.Players.LocalPlayer.PlayerScripts:FindFirstChild("frontlines_client_actor")

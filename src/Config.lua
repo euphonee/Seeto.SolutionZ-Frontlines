@@ -16,14 +16,14 @@ local function ensureDirectory()
 end
 
 local Config = {
-    VERSION = "v1.7",
+    VERSION = "v1.8",
 
     -- Aim
     SILENT_AIM_ENABLED = true,
     ZERO_SPREAD_ENABLED = true,
     NO_RECOIL_ENABLED = true,
     TARGET_PRIORITY = "Auto",
-    FOV_RADIUS = 237,
+    FOV_RADIUS = 243,
     FOV_CIRCLE_ENABLED = true,
     FOV_CIRCLE_TRANSPARENCY = 0.18,
     FOV_CIRCLE_COLOR = Color3.fromRGB(255, 255, 255),
@@ -36,7 +36,7 @@ local Config = {
     KNIFE_ESP_ENABLED = true,
     SHOW_NAMES_BELOW = false,
     HEALTH_BAR_ENABLED = true,
-    VIEWANGLE_ENABLED = true,
+    VIEWANGLE_ENABLED = false,
     LOOK_LINE_LENGTH = 4.5,
     TARGET_SNAPLINE_ENABLED = false,
     DISABLE_TEAMMATES = true,
@@ -51,7 +51,7 @@ local Config = {
     SPEED_BOOST_ENABLED = false,
     SPEED_BOOST_PERCENT = 100,
     FLY_ENABLED = false,
-    FLY_SPEED = 50,
+    FLY_SPEED = 103,
     NOCLIP_ENABLED = false,
 
     -- Colors
@@ -70,9 +70,11 @@ local Config = {
     TOGGLE_ESP_KEY = nil,
     TOGGLE_FLY_KEY = "None",
     TOGGLE_NOCLIP_KEY = "None",
-    UNLOAD_KEY = Enum.KeyCode.K,
+    UNLOAD_KEY = Enum.KeyCode.P,
 
     MENU_OPEN = true,
+    WINDOW_SIZE_X = 380,
+    WINDOW_SIZE_Y = 319,
 
     -- Theme
     UI_THEME = {
@@ -96,7 +98,7 @@ local DEFAULT_VALUES = {
     ZERO_SPREAD_ENABLED = true,
     NO_RECOIL_ENABLED = true,
     TARGET_PRIORITY = "Auto",
-    FOV_RADIUS = 237,
+    FOV_RADIUS = 243,
     FOV_CIRCLE_ENABLED = true,
     FOV_CIRCLE_TRANSPARENCY = 0.18,
     ESP_ENABLED = true,
@@ -106,7 +108,7 @@ local DEFAULT_VALUES = {
     KNIFE_ESP_ENABLED = true,
     SHOW_NAMES_BELOW = false,
     HEALTH_BAR_ENABLED = true,
-    VIEWANGLE_ENABLED = true,
+    VIEWANGLE_ENABLED = false,
     TARGET_SNAPLINE_ENABLED = false,
     DISABLE_TEAMMATES = true,
     TRACER_BEAMS_ENABLED = false,
@@ -115,8 +117,10 @@ local DEFAULT_VALUES = {
     SPEED_BOOST_ENABLED = false,
     SPEED_BOOST_PERCENT = 100,
     FLY_ENABLED = false,
-    FLY_SPEED = 50,
+    FLY_SPEED = 103,
     NOCLIP_ENABLED = false,
+    WINDOW_SIZE_X = 380,
+    WINDOW_SIZE_Y = 319,
     TOGGLE_UI_KEY = "Insert",
     TOGGLE_UI_KEY_ALT = "RightShift",
     TOGGLE_AIM_KEY = "None",
@@ -124,7 +128,7 @@ local DEFAULT_VALUES = {
     TOGGLE_ESP_KEY = "None",
     TOGGLE_FLY_KEY = "None",
     TOGGLE_NOCLIP_KEY = "None",
-    UNLOAD_KEY = "K"
+    UNLOAD_KEY = "P"
 }
 
 -- Global persistent input table

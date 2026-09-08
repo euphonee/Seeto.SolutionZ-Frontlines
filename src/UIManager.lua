@@ -47,8 +47,16 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
         Title = windowTitle,
         Center = true,
         AutoShow = (Config.MENU_OPEN ~= false),
-        TabPadding = 8,
-        MenuFadeTime = 0.2
+        TabPadding = 6,
+        MenuFadeTime = 0.2,
+        Size = UDim2.fromOffset(Config.WINDOW_SIZE_X or 380, Config.WINDOW_SIZE_Y or 210),
+        ResizeCallback = function(w, h)
+            if Config.WINDOW_SIZE_X ~= w or Config.WINDOW_SIZE_Y ~= h then
+                Config.WINDOW_SIZE_X = w
+                Config.WINDOW_SIZE_Y = h
+                queueAutoSave()
+            end
+        end
     })
     UIManager.Window = Window
 
@@ -430,11 +438,17 @@ function UIManager.init(Config, Library, SilentAim, Movement, unloadCallback)
 
             if Options.MenuKeybind then Options.MenuKeybind:SetValue("Insert") end
             if Options.AimKeybind then Options.AimKeybind:SetValue("None") end
-            if Options.AimBindMode then Options.AimBindMode:SetValue("Toggle") end
+            if Options.AimBindMode then Options.AimBindMode:SetValue("Hold") end
             if Options.EspKeybind then Options.EspKeybind:SetValue("None") end
             if Options.FlyKeybind then Options.FlyKeybind:SetValue("None") end
             if Options.NoclipKeybind then Options.NoclipKeybind:SetValue("None") end
-            if Options.UnloadKeybind then Options.UnloadKeybind:SetValue("K") end
+            if Options.UnloadKeybind then Options.UnloadKeybind:SetValue("P") end
+
+            Config.WINDOW_SIZE_X = 380
+            Config.WINDOW_SIZE_Y = 319
+            if Window and Window.Outer then
+                Window.Outer.Size = UDim2.fromOffset(380, 319)
+            end
 
             queueAutoSave()
             Library:Notify("Settings reset to defaults", 2)

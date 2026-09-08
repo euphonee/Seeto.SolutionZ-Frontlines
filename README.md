@@ -21,4 +21,4 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/euphonee/Seeto.Soluti
 ## Default Binds
 
 - **Menu**: `Insert` / `RightShift`
-- **Kill / Panic**: `K`
+- **Kill / Panic**: `P`

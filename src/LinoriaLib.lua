@@ -191,10 +191,22 @@ function Library:MakeDraggable(Instance, Cutoff)
 end;
 
 function Library:MakeResizable(Instance, MinWidth, MinHeight, MaxWidth, MaxHeight, ResizeCallback)
-    MinWidth = MinWidth or 480;
-    MinHeight = MinHeight or 360;
-    MaxWidth = MaxWidth or 1200;
-    MaxHeight = MaxHeight or 900;
+    local function getMinWidth()
+        if type(MinWidth) == 'function' then return MinWidth() end
+        return MinWidth or 380;
+    end
+    local function getMinHeight()
+        if type(MinHeight) == 'function' then return MinHeight() end
+        return MinHeight or 210;
+    end
+    local function getMaxWidth()
+        if type(MaxWidth) == 'function' then return MaxWidth() end
+        return MaxWidth or 1200;
+    end
+    local function getMaxHeight()
+        if type(MaxHeight) == 'function' then return MaxHeight() end
+        return MaxHeight or 900;
+    end
 
     local ResizeGrip = Library:Create('ImageButton', {
         AnchorPoint = Vector2.new(1, 1),
@@ -254,8 +266,8 @@ function Library:MakeResizable(Instance, MinWidth, MinHeight, MaxWidth, MaxHeigh
                 local deltaX = Mouse.X - startMouse.X;
                 local deltaY = Mouse.Y - startMouse.Y;
 
-                local newWidth = math.clamp(startSize.X + deltaX, MinWidth, MaxWidth);
-                local newHeight = math.clamp(startSize.Y + deltaY, MinHeight, MaxHeight);
+                local newWidth = math.clamp(startSize.X + deltaX, getMinWidth(), getMaxWidth());
+                local newHeight = math.clamp(startSize.Y + deltaY, getMinHeight(), getMaxHeight());
 
                 Instance.Size = UDim2.fromOffset(newWidth, newHeight);
 
@@ -2109,7 +2121,6 @@ do
             Min = Info.Min;
             Max = Info.Max;
             Rounding = Info.Rounding;
-            MaxSize = 232;
             Type = 'Slider';
             Callback = Info.Callback or function(Value) end;
         };
@@ -2148,6 +2159,7 @@ do
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
+            ClipsDescendants = true;
             ZIndex = 6;
             Parent = SliderOuter;
         });
@@ -2160,6 +2172,7 @@ do
         local Fill = Library:Create('Frame', {
             BackgroundColor3 = Library.AccentColor;
             BorderColor3 = Library.AccentColorDark;
+            BorderSizePixel = 0;
             Size = UDim2.new(0, 0, 1, 0);
             ZIndex = 7;
             Parent = SliderInner;
@@ -2216,10 +2229,10 @@ do
                 DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
             end
 
-            local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
-            Fill.Size = UDim2.new(0, X, 1, 0);
+            local fraction = (Slider.Max == Slider.Min) and 0 or math.clamp((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1);
+            Fill.Size = UDim2.new(fraction, 0, 1, 0);
 
-            HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
+            HideBorderRight.Visible = (fraction > 0 and fraction < 1);
         end;
 
         function Slider:OnChanged(Func)
@@ -2229,15 +2242,16 @@ do
 
         local function Round(Value)
             if Slider.Rounding == 0 then
-                return math.floor(Value);
+                return math.floor(Value + 0.5);
             end;
-
 
             return tonumber(string.format('%.' .. Slider.Rounding .. 'f', Value))
         end;
 
         function Slider:GetValueFromXOffset(X)
-            return Round(Library:MapValue(X, 0, Slider.MaxSize, Slider.Min, Slider.Max));
+            local width = math.max(SliderInner.AbsoluteSize.X, 1);
+            local fraction = math.clamp(X / width, 0, 1);
+            return Round(Slider.Min + fraction * (Slider.Max - Slider.Min));
         end;
 
         function Slider:SetValue(Str)
@@ -2258,15 +2272,9 @@ do
 
         SliderInner.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
-                local mPos = Mouse.X;
-                local gPos = Fill.Size.X.Offset;
-                local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
-
                 while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                    local nMPos = Mouse.X;
-                    local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, Slider.MaxSize);
-
-                    local nValue = Slider:GetValueFromXOffset(nX);
+                    local relX = Mouse.X - SliderInner.AbsolutePosition.X;
+                    local nValue = Slider:GetValueFromXOffset(relX);
                     local OldValue = Slider.Value;
                     Slider.Value = nValue;
 
@@ -3093,7 +3101,7 @@ function Library:CreateWindow(...)
     if type(Config.MenuFadeTime) ~= 'number' then Config.MenuFadeTime = 0.2 end
 
     if typeof(Config.Position) ~= 'UDim2' then Config.Position = UDim2.fromOffset(175, 50) end
-    if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(550, 600) end
+    if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(380, 210) end
 
     if Config.Center then
         Config.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -3114,9 +3122,6 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = ScreenGui;
     });
-
-    Library:MakeDraggable(Outer, 25);
-    Library:MakeResizable(Outer, 480, 360, 1200, 900);
 
     local Inner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
@@ -3184,6 +3189,19 @@ function Library:CreateWindow(...)
         SortOrder = Enum.SortOrder.LayoutOrder;
         Parent = TabArea;
     });
+
+    local function getDynamicMinWidth()
+        local contentW = TabListLayout.AbsoluteContentSize.X;
+        if contentW and contentW > 0 then
+            return math.max(contentW + 36, Config.MinWidth or 380);
+        end
+        return Config.MinWidth or 380;
+    end
+
+    Library:MakeDraggable(Outer, 25);
+    Library:MakeResizable(Outer, getDynamicMinWidth, Config.MinHeight or 210, Config.MaxWidth or 1200, Config.MaxHeight or 900, Config.ResizeCallback);
+
+    Window.Outer = Outer;
 
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
@@ -3260,12 +3278,13 @@ function Library:CreateWindow(...)
         local LeftSide = Library:Create('ScrollingFrame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
-            Position = UDim2.new(0, 8 - 1, 0, 8 - 1);
-            Size = UDim2.new(0.5, -12 + 2, 0, 507 + 2);
+            Position = UDim2.new(0, 6, 0, 6);
+            Size = UDim2.new(0.5, -9, 1, -12);
             CanvasSize = UDim2.new(0, 0, 0, 0);
-            BottomImage = '';
-            TopImage = '';
-            ScrollBarThickness = 0;
+            BottomImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+            TopImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+            ScrollBarThickness = 2;
+            ScrollBarImageColor3 = Library.AccentColor;
             ZIndex = 2;
             Parent = TabFrame;
         });
@@ -3273,12 +3292,13 @@ function Library:CreateWindow(...)
         local RightSide = Library:Create('ScrollingFrame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
-            Position = UDim2.new(0.5, 4 + 1, 0, 8 - 1);
-            Size = UDim2.new(0.5, -12 + 2, 0, 507 + 2);
+            Position = UDim2.new(0.5, 3, 0, 6);
+            Size = UDim2.new(0.5, -9, 1, -12);
             CanvasSize = UDim2.new(0, 0, 0, 0);
-            BottomImage = '';
-            TopImage = '';
-            ScrollBarThickness = 0;
+            BottomImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+            TopImage = 'rbxasset://textures/ui/Scroll/scroll-middle.png';
+            ScrollBarThickness = 2;
+            ScrollBarImageColor3 = Library.AccentColor;
             ZIndex = 2;
             Parent = TabFrame;
         });
@@ -3300,6 +3320,9 @@ function Library:CreateWindow(...)
         });
 
         for _, Side in next, { LeftSide, RightSide } do
+            Library:AddToRegistry(Side, {
+                ScrollBarImageColor3 = 'AccentColor'
+            });
             Side:WaitForChild('UIListLayout'):GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
                 Side.CanvasSize = UDim2.fromOffset(0, Side.UIListLayout.AbsoluteContentSize.Y);
             end);
